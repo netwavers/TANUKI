@@ -1,0 +1,309 @@
+:root {
+    --bg-dark: #0a0b10;
+    --sonic-brown: #7b5559;
+    --ethereal-blue: #43627d;
+    --sunset-gold: #dea584;
+    --text-main: #e0e0e0;
+    --text-dim: #a0a0a0;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --accent-glow: rgba(222, 165, 132, 0.2);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'Outfit', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Background with SonicEther Concept */
+.background-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('assets/background.png?v=1') no-repeat center center;
+    background-size: cover;
+    filter: brightness(0.6) saturate(1.2);
+    z-index: -2;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 0%, rgba(222, 165, 132, 0.15) 0%, transparent 70%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Typography */
+.glow-text {
+    background: linear-gradient(to bottom, #ffffff, var(--sunset-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 10px rgba(222, 165, 132, 0.5));
+}
+
+.mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Navigation */
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 3rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.logo i { color: var(--sunset-gold); }
+.logo span span { color: var(--text-dim); font-weight: 300; }
+
+.nav-links {
+    display: flex;
+    gap: 2.5rem;
+}
+
+.nav-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-links a.active, .nav-links a:hover {
+    color: white;
+    text-shadow: 0 0 8px rgba(255,255,255,0.5);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+/* Main Content */
+main {
+    max-width: 1200px;
+    margin: 4rem auto;
+    padding: 0 2rem;
+}
+
+.hero {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.hero h1 {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+}
+
+/* Search */
+.search-container {
+    margin-bottom: 4rem;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    padding: 1rem 2rem;
+    border-radius: 1.5rem;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.search-box i { color: var(--text-dim); margin-right: 1rem; }
+.search-box input {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    width: 100%;
+    outline: none;
+}
+
+.search-box kbd {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+/* Bento Grid */
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.bento-item {
+    padding: 2rem;
+    border-radius: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.col-span-1 { grid-column: span 1; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+
+.bento-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+}
+
+.bento-header i { color: var(--sunset-gold); }
+.bento-header h3 { font-size: 1.2rem; font-weight: 600; color: white; }
+
+.stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.stat label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.stat .value.mono {
+    font-size: 1.1rem;
+    color: var(--sunset-gold);
+}
+
+/* Cluster List */
+.cluster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.cluster-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 1.5rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 1rem;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.cluster-card:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--sunset-gold);
+    transform: translateX(5px);
+}
+
+.cluster-info .category {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--sunset-gold);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.cluster-info h4 {
+    font-size: 1.1rem;
+    margin-top: 0.2rem;
+}
+
+/* Logs */
+.log-view {
+    background: rgba(0,0,0,0.3);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    height: 250px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.log-line { margin-bottom: 0.4rem; }
+.log-line.info { color: var(--text-dim); }
+.log-line.success { color: #4ade80; }
+.log-line.pulse {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: var(--sunset-gold);
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}

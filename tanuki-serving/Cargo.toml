@@ -1,0 +1,18 @@
+[package]
+name = "tanuki-serving"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tanuki-core = { path = "../tanuki-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+regex = "1.10"
+axum = { workspace = true }
+tower-http = { workspace = true }
+utoipa = { workspace = true }
+tanuki-compiler = { path = "../tanuki-compiler" }
+unicode-normalization = "0.1.24"

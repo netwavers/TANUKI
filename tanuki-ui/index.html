@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐾 TANUKI Knowledge Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    
+    <nav class="glass">
+        <div class="logo">
+            <i data-lucide="brain-circuit"></i>
+            <span>T.A.N.U.K.I. <span>Explorer</span></span>
+        </div>
+        <div class="nav-links">
+            <a href="#" class="active">Dashboard</a>
+            <a href="#">Knowledge Tree</a>
+            <a href="#">Systems</a>
+        </div>
+        <div class="status-indicator">
+            <span class="dot pulse"></span>
+            Serving Online
+        </div>
+    </nav>
+
+    <main>
+        <header class="hero">
+            <h1 class="glow-text">Ethereal Knowledge.</h1>
+            <p>TANUKI AST 知識エンジンの全貌を、エーテルの輝きと共に。</p>
+        </header>
+
+        <section class="search-container">
+            <div class="search-box glass">
+                <i data-lucide="search"></i>
+                <input type="text" placeholder="記憶の断片を検索...">
+                <kbd>/</kbd>
+            </div>
+        </section>
+
+        <section class="bento-grid">
+            <!-- Stats Column -->
+            <div class="bento-item glass col-span-1">
+                <div class="bento-header">
+                    <i data-lucide="activity"></i>
+                    <h3>Status</h3>
+                </div>
+                <div class="stats-list">
+                    <div class="stat">
+                        <label>Total Nodes</label>
+                        <span class="value">1,248</span>
+                    </div>
+                    <div class="stat">
+                        <label>AST Hash</label>
+                        <span class="value mono">7de65149...</span>
+                    </div>
+                    <div class="stat">
+                        <label>Last Build</label>
+                        <span class="value">2 mins ago</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Tree Column -->
+            <div class="bento-item glass col-span-2">
+                <div class="bento-header">
+                    <i data-lucide="network"></i>
+                    <h3>Recent Knowledge Clusters</h3>
+                </div>
+                <div class="cluster-list">
+                    <div class="cluster-card">
+                        <div class="cluster-info">
+                            <span class="category">Devlog</span>
+                            <h4>TANUKI識別ロジックのハッシュ化</h4>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div class="cluster-card">
+                        <div class="cluster-info">
+                            <span class="category">Architecture</span>
+                            <h4>VRAM排他制御プロトコル v2</h4>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div class="cluster-card">
+                        <div class="cluster-info">
+                            <span class="category">Specification</span>
+                            <h4>リアルタイムTTS状態継承型キャッシュ</h4>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs/Terminal -->
+            <div class="bento-item glass col-span-3">
+                <div class="bento-header">
+                    <i data-lucide="terminal"></i>
+                    <h3>System Logs</h3>
+                </div>
+                <div class="log-view mono">
+                    <div class="log-line info">[21:27:09] T.A.N.U.K.I. Compiler starting...</div>
+                    <div class="log-line success">[21:27:10] 🔄 Resume Protocol: AST Hash matched!</div>
+                    <div class="log-line info">[21:27:11] Scanning directory: ../Documents/Archive/Devlog</div>
+                    <div class="log-line success">[21:27:23] Backend: Tree generation complete.</div>
+                    <div class="log-line info">[21:27:23] Phase 5: Packing AST Knowledge Tree...</div>
+                    <div class="log-line pulse">_</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        const searchInput = document.querySelector('.search-box input');
+        const clusterList = document.querySelector('.cluster-list');
+        const totalNodesEl = document.querySelector('.stat:nth-child(1) .value');
+        
+        // 開発環境(localhost:3000)と本番環境(tanuki-factory:3001)を考慮
+        const API_PORT = window.location.port === '3000' || window.location.hostname === 'localhost' ? '3000' : '3001';
+        const API_BASE = `http://${window.location.hostname}:${API_PORT}`;
+
+        async function loadData() {
+            try {
+                const clustersResponse = await fetch(`${API_BASE}/api/clusters`, { mode: 'cors' });
+                const clusters = await clustersResponse.json();
+                
+                const nodesResponse = await fetch(`${API_BASE}/api/nodes`, { mode: 'cors' });
+                const nodes = await nodesResponse.json();
+
+                totalNodesEl.textContent = nodes.length.toLocaleString();
+                
+                if (clusters.length > 0) {
+                    renderClusters(clusters);
+                } else {
+                    renderNodes(nodes);
+                }
+            } catch (err) {
+                console.error("Failed to load data:", err);
+                clusterList.innerHTML = `<div style="padding: 2rem; color: #ff5f56;">API接続エラー: ${err.message}<br><small>サーバーが ${API_BASE} で起動しているか確認してください。</small></div>`;
+            }
+        }
+
+        function renderClusters(clusters) {
+            clusterList.innerHTML = clusters.map(c => `
+                <div class="cluster-card">
+                    <div class="cluster-info">
+                        <span class="category">Cluster</span>
+                        <h4>${c.title}</h4>
+                    </div>
+                    <i data-lucide="chevron-right"></i>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderNodes(nodes) {
+            clusterList.innerHTML = nodes.map(n => `
+                <div class="cluster-card search-result">
+                    <div class="cluster-info">
+                        <span class="category">Node</span>
+                        <h4>${n.title}</h4>
+                    </div>
+                    <i data-lucide="external-link"></i>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function performSearch(query) {
+            if (!query) {
+                loadData();
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`, { mode: 'cors' });
+                const nodes = await response.json();
+                renderNodes(nodes);
+                if (nodes.length === 0) {
+                    clusterList.innerHTML = '<div style="padding: 2rem; color: var(--text-dim);">一致する知見が見つかりませんでした。</div>';
+                }
+            } catch (err) {
+                console.error("Search failed:", err);
+                clusterList.innerHTML = `<div style="padding: 2rem; color: #ff5f56;">検索エラー: ${err.message}</div>`;
+            }
+        }
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                performSearch(e.target.value);
+            }
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

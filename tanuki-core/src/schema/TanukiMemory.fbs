@@ -1,0 +1,30 @@
+// TanukiMemory.fbs
+namespace Tanuki.Irminsul;
+
+// 概念ベクトル
+table ConceptVector {
+  // MRL対応 nomic-embed-text-v1.5 (768次元)
+  v: [float];
+}
+
+// ゼロコピー・インメモリ用の厳格なノード定義
+table ASTNode {
+  node_id: uint64 (id: 0);          // 物理的・不変なID
+  merkle_hash: [ubyte] (id: 1);     // 差分検知用ハッシュ（SHA-256）
+  
+  parent_id: uint64 (id: 2);        // 木構造の維持（親ノードのハッシュID）
+  child_count: uint32 (id: 3);       // 直属の子ノードの数
+  descendant_count: uint32 (id: 4);  // 自身配下の全子孫ノードの総数（★スキップ用）
+  
+  title: string (id: 5);            // 決定論的ナビゲーション用のタイトル
+  concept: ConceptVector (id: 6);   // 意味論的特徴（必ず768次元固定）
+  raw_logic: string (id: 7);        // 実行ロジック（生のMarkdown / 抽出ロジック）
+}
+
+// Irminsulの共有メモリ・ルート
+table MemoryRoot {
+  version: uint32 (id: 0);
+  active_nodes: [ASTNode] (id: 1);
+}
+
+root_type MemoryRoot;

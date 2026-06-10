@@ -1,0 +1,40 @@
+@namespace Tanuki
+@class MarkdownParser
+
+@decl String context
+@decl String nodes
+
+@token H6 "######"
+@token H5 "#####"
+@token H4 "####"
+@token H3 "###"
+@token H2 "##"
+@token H1 "#"
+@token CODE "```"
+@token TEXT
+@token NL
+@token SPACE " "
+
+@@
+document = element*
+
+element = header | code_block | paragraph | empty_line
+
+header = h1 | h2 | h3 | h4 | h5 | h6
+
+h1 = H1 SPACE* text_line NL @{ self.on_header(1); @}
+h2 = H2 SPACE* text_line NL @{ self.on_header(2); @}
+h3 = H3 SPACE* text_line NL @{ self.on_header(3); @}
+h4 = H4 SPACE* text_line NL @{ self.on_header(4); @}
+h5 = H5 SPACE* text_line NL @{ self.on_header(5); @}
+h6 = H6 SPACE* text_line NL @{ self.on_header(6); @}
+
+text_line = ( TEXT | SPACE )*
+
+paragraph = TEXT ( TEXT | SPACE | NL )* NL @{ self.on_paragraph(); @}
+
+code_block = CODE [ TEXT ] NL body_line* CODE NL @{ self.on_code_block(); @}
+
+body_line = TEXT | SPACE | NL
+
+empty_line = SPACE* NL

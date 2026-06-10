@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  tanuki-serving:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tanuki-serving
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./knowledge.db:/app/knowledge.db
+      - ./output_knowledge:/app/output_knowledge
+      - ../Documents:/app/Documents
+    networks:
+      - rin-network
+
+networks:
+  rin-network:
+    external: true
+    name: elyth_bridge_rin-network

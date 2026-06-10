@@ -1,0 +1,22 @@
+[package]
+name = "tanuki-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+lazy_static = { workspace = true }
+bincode = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+flatbuffers = { workspace = true }
+memmap2 = { workspace = true }
+arc-swap = { workspace = true }

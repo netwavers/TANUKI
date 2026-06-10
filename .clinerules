@@ -1,0 +1,9 @@
+# 【厳格制約：TANUKI Knowledge Tree へのアクセス仕様】
+
+## 1. 知識アクセス経路の制限
+- 知識検索において、シェルコマンド（`run_command` 等）を用いて `tanuki_explorer.py` を直接子プロセスとして実行することは【厳禁】とする（多重ループによる破綻を防ぐため）。
+- 知識ベース（`output_knowledge`）内の生Markdownファイルに対する、階層構造を無視した `grep_search` は禁止する。
+
+## 2. ネイティブMCPツールの強制
+- 過去の仕様、Rin AI Engine of Context、および開発日誌の探索には、必ず本プロジェクト専用のMCPツール `tanuki-mcp-bridge` の `query_knowledge_ast` を使用すること。
+- 取得したASTノード（Packed Tree）のシリアライズされたコンテキストを、現在の思考セッション（Working Memory）に直接マウントして推論を組み立てよ。
