@@ -3,7 +3,7 @@ use tanuki_compiler::{
     parse_markdown_file, process_nodes, reduce_knowledge, 
     generate_tree, generate_checkpoint, calculate_ast_root_hash
 };
-use tanuki_core::llm::OllamaClient;
+use tanuki_core::llm::{LlmProvider, load_provider};
 use tanuki_core::db::TanukiDb;
 use tanuki_core::Checkpoint;
 use walkdir::WalkDir;
@@ -25,22 +25,45 @@ async fn main() -> Result<()> {
         println!("T.A.N.U.K.I. Compiler starting...");
     }
 
-    let center_url = "http://localhost:11434".to_string();
+    let config_path = std::env::var("TANUKI_MODELS_CONFIG").unwrap_or_else(|_| "config/models_config.json".to_string());
     let model_name = std::env::var("TANUKI_MODEL").unwrap_or_else(|_| "gemma4:e4b".to_string());
-    println!("  Unified Model Selected: {}", model_name);
+    println!("  Unified Model Selected: {} (Config: {})", model_name, config_path);
+
+    // configフォルダがない場合は自動作成する
+    if let Some(parent) = std::path::Path::new(&config_path).parent() {
+        if !parent.exists() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    }
+
+    // models_config.jsonが存在しない場合のデフォルト生成フォールバック
+    if !std::path::Path::new(&config_path).exists() {
+        println!("  ⚠️ Models config file not found. Creating a default offline config for gemma4:e4b...");
+        let default_config = serde_json::json!({
+            "gemma4:e4b": {
+                "model_name": "gemma4:e4b",
+                "provider": "Ollama",
+                "display_name": "Gemma 4 Local",
+                "base_url": "http://localhost:11434"
+            }
+        });
+        if let Ok(json_str) = serde_json::to_string_pretty(&default_config) {
+            let _ = std::fs::write(&config_path, json_str);
+        }
+    }
     
-    let unified_llm = OllamaClient::new(center_url, model_name);
+    let unified_llm = load_provider(&config_path, &model_name)?;
 
-    let res = run_pipeline(no_reduce, &unified_llm).await;
+    let res = run_pipeline(no_reduce, unified_llm.as_ref()).await;
 
-    // VRAMの防衛: 成功・失敗を問わず、必ずOllamaのVRAMモデルをアンロードする
-    println!("  🧹 VRAM Guard: Unloading model from GPU...");
+    // VRAMの防衛: 成功・失敗を問わず、必ずOllama等のVRAMモデルをアンロードする
+    println!("  🧹 VRAM Guard: Unloading model from GPU/Cloud context...");
     let _ = unified_llm.unload().await;
 
     res
 }
 
-async fn run_pipeline(no_reduce: bool, unified_llm: &OllamaClient) -> Result<()> {
+async fn run_pipeline(no_reduce: bool, unified_llm: &dyn LlmProvider) -> Result<()> {
     // 対象ディレクトリのリスト (プロジェクトルートからの相対パス)
     let target_dirs = vec![
         "../../Documents/InBox",
