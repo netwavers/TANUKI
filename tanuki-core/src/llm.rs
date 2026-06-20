@@ -93,7 +93,10 @@ pub fn load_provider(config_path: &str, model_name: &str) -> Result<Box<dyn LlmP
 
     match config.provider {
         ModelProvider::Gemini => {
-            let api_key = config.api_key.ok_or_else(|| anyhow::anyhow!("API key is required for Gemini provider"))?;
+            let api_key = config.api_key
+                .or_else(|| std::env::var("GEMINI_API_KEY").ok())
+                .or_else(|| std::env::var("GOOGLE_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("API key is required for Gemini provider (define 'api_key' in config or set GEMINI_API_KEY env)"))?;
             let model = config.model_name;
             Ok(Box::new(GeminiClient::new(api_key, model)))
         }

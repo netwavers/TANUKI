@@ -17,6 +17,25 @@ const CHECKPOINT_PATH: &str = ".gemini/memory/tanuki_checkpoint.json";
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // .env ファイルの自動読み込み (標準ライブラリによる簡易実装)
+    if let Ok(content) = std::fs::read_to_string(".env") {
+        for line in content.lines() {
+            let line = line.trim();
+            if !line.is_empty() && !line.starts_with('#') {
+                if let Some((key, val)) = line.split_once('=') {
+                    let key = key.trim();
+                    let mut val = val.trim();
+                    if (val.starts_with('"') && val.ends_with('"')) || (val.starts_with('\'') && val.ends_with('\'')) {
+                        val = &val[1..val.len() - 1];
+                    }
+                    if std::env::var(key).is_err() {
+                        std::env::set_var(key, val);
+                    }
+                }
+            }
+        }
+    }
+
     // 軽量ビルドモード: TANUKI_NO_REDUCE=1 を設定するとReduce処理をスキップする
     let no_reduce = std::env::var("TANUKI_NO_REDUCE").map(|v| v == "1").unwrap_or(false);
     if no_reduce {
@@ -64,13 +83,20 @@ async fn main() -> Result<()> {
 }
 
 async fn run_pipeline(no_reduce: bool, unified_llm: &dyn LlmProvider) -> Result<()> {
-    // 対象ディレクトリのリスト (プロジェクトルートからの相対パス)
-    let target_dirs = vec![
-        "../../Documents/InBox",
-        "../../Documents/Archive/Devlog",
-        "../../Documents/Archive/Media",
-        "../../Documents/Archive/Specifications",
-    ];
+    // 対象ディレクトリのリスト (環境変数から取得、未指定ならデフォルトにフォールバック)
+    let env_dirs = std::env::var("TANUKI_TARGET_DIRS").ok();
+    let target_dirs_owned: Vec<String> = if let Some(ref dirs_str) = env_dirs {
+        dirs_str.split(',').map(|s| s.trim().to_string()).collect()
+    } else {
+        vec![
+            "../../Documents/InBox".to_string(),
+            "../../Documents/Archive/Devlog".to_string(),
+            "../../Documents/Archive/Media".to_string(),
+            "../../Documents/Archive/Specifications".to_string(),
+        ]
+    };
+
+    let target_dirs: Vec<&str> = target_dirs_owned.iter().map(|s| s.as_str()).collect();
 
     // Phase -1: Load Checkpoint (Resume Protocol)
     let current_hash = calculate_ast_root_hash(&target_dirs)?;

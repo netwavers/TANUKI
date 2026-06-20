@@ -23,6 +23,19 @@ for _stream in (sys.stderr, sys.stdin):
         except Exception:
             pass
 
+# .env ファイルの自動読み込み (標準ライブラリによる簡易実装)
+if os.path.exists(".env"):
+    with open(".env", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                parts = line.split("=", 1)
+                if len(parts) == 2:
+                    key, value = parts[0].strip(), parts[1].strip()
+                    if value.startswith(('"', "'")) and value.endswith(('"', "'")):
+                        value = value[1:-1]
+                    os.environ.setdefault(key, value)
+
 # TANUKI Serving API Base
 TANUKI_API_BASE = os.getenv("TANUKI_API_BASE", "http://192.168.2.144:3001")
 
