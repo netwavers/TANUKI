@@ -1,7 +1,8 @@
 use anyhow::Result;
 use tanuki_compiler::{
     parse_markdown_file, process_nodes, reduce_knowledge, 
-    generate_tree, generate_checkpoint, calculate_ast_root_hash
+    generate_tree, generate_checkpoint, calculate_ast_root_hash,
+    pack_knowledge_base
 };
 use tanuki_core::llm::{LlmProvider, load_provider};
 use tanuki_core::db::TanukiDb;
@@ -431,6 +432,10 @@ async fn run_pipeline(
     let json = serde_json::to_string_pretty(&checkpoint)?;
     fs::write(CHECKPOINT_PATH, json)?;
     println!("  ✓ Checkpoint saved to: {}", CHECKPOINT_PATH);
+
+    // Phase 5.5: FlatBuffers Binary Packing
+    let mmap_output_path = "knowledge.bin";
+    pack_knowledge_base(&db, mmap_output_path)?;
 
     println!("Pipeline finished successfully!");
     Ok(())

@@ -31,6 +31,12 @@ pub struct KnowledgeNode {
     pub metadata: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct KnowledgeNodeWithEmbedding {
+    pub node: KnowledgeNode,
+    pub embedding: Vec<f32>,
+}
+
 pub struct FileMeta {
     pub path: String,
     pub mtime: u64,
@@ -231,9 +237,47 @@ impl TanukiDb {
         Ok(())
     }
 
-    pub fn get_link_count(&self) -> Result<i64> {
+     pub fn get_link_count(&self) -> Result<i64> {
         let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM links")?;
         stmt.query_row([], |row| row.get(0))
+    }
+
+    pub fn get_all_nodes_with_embedding(&self) -> Result<Vec<KnowledgeNodeWithEmbedding>> {
+        let mut stmt = self.conn.prepare("SELECT id, source_path, file_hash, context_path, title, content, summary, metadata, embedding FROM nodes")?;
+        let node_iter = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let source_path: String = row.get(1)?;
+            let file_hash: Option<String> = row.get(2)?;
+            let context_path: String = row.get(3)?;
+            let title: String = row.get(4)?;
+            let content: String = row.get(5)?;
+            let summary: String = row.get(6)?;
+            let metadata: String = row.get(7)?;
+            let embedding_blob: Vec<u8> = row.get(8)?;
+            
+            let embedding: Vec<f32> = bincode::deserialize(&embedding_blob)
+                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Blob, Box::new(e)))?;
+                
+            Ok(KnowledgeNodeWithEmbedding {
+                node: KnowledgeNode {
+                    id,
+                    source_path,
+                    file_hash,
+                    context_path,
+                    title,
+                    content,
+                    summary,
+                    metadata,
+                },
+                embedding,
+            })
+        })?;
+
+        let mut nodes = Vec::new();
+        for node in node_iter {
+            nodes.push(node?);
+        }
+        Ok(nodes)
     }
 
     // --- Speculative Transactions ---

@@ -3,6 +3,7 @@ members = [
     "tanuki-core",
     "tanuki-compiler",
     "tanuki-serving",
+    "tanuki-py",
 ]
 resolver = "2"
 
