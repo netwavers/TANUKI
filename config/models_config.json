@@ -1,0 +1,14 @@
+{
+  "gemma4:e2b": {
+    "base_url": "http://localhost:11434",
+    "display_name": "Gemma 4 Local (Lightweight)",
+    "model_name": "gemma4:e2b",
+    "provider": "Ollama"
+  },
+  "gemma4:e4b": {
+    "base_url": "http://localhost:11434",
+    "display_name": "Gemma 4 Local (Default)",
+    "model_name": "gemma4:e4b",
+    "provider": "Ollama"
+  }
+}
