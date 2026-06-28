@@ -16,3 +16,4 @@ build_errors.txt
 build_errors_utf8.txt
 log.txt
 serving_log.txt
+knowledge.bin
