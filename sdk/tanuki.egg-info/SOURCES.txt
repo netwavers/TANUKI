@@ -1,0 +1,8 @@
+setup.py
+tanuki/__init__.py
+tanuki/client.py
+tanuki.egg-info/PKG-INFO
+tanuki.egg-info/SOURCES.txt
+tanuki.egg-info/dependency_links.txt
+tanuki.egg-info/requires.txt
+tanuki.egg-info/top_level.txt

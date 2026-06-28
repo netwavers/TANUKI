@@ -1,0 +1,13 @@
+[package]
+name = "tanuki-rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tanuki_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+tanuki-core = { path = "../tanuki-core" }
+pyo3 = { version = "0.18", features = ["extension-module", "abi3-py37"] }
+anyhow = { workspace = true }
