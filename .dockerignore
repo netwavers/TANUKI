@@ -1,0 +1,19 @@
+# Docker build ignore list
+target/
+.git/
+.venv/
+venv/
+knowledge.db
+knowledge.bin
+output_knowledge/
+.env
+.env.bak
+.gemini/
+build_errors.txt
+build_errors_utf8.txt
+log.txt
+serving_log.txt
+tanuki-py/target/
+tanuki-core/target/
+tanuki-compiler/target/
+tanuki-serving/target/

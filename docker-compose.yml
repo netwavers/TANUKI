@@ -12,11 +12,70 @@ services:
     volumes:
       - ./knowledge.db:/app/knowledge.db
       - ./output_knowledge:/app/output_knowledge
-      - ../Documents:/app/Documents
+      - ./documents:/app/documents
+    environment:
+      - TANUKI_API_BASE=http://localhost:3001
+      - TANUKI_MODEL=qwen2.5-coder:1.5b
+      - TANUKI_TARGET_DIRS=./documents
+    depends_on:
+      - ollama
     networks:
-      - rin-network
+      - tanuki-network
+
+  tanuki-ui:
+    image: nginx:alpine
+    container_name: tanuki-ui
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./tanuki-ui:/usr/share/nginx/html:ro
+    networks:
+      - tanuki-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # 🐾 GPUを使用する場合は、以下のブロックのコメントアウトを解除してください
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    networks:
+      - tanuki-network
+    dns:
+      - 8.8.8.8
+
+  ollama-puller:
+    image: curlimages/curl:latest
+    container_name: ollama-puller
+    depends_on:
+      - ollama
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: >
+      "
+      echo 'Waiting for Ollama to start...' &&
+      until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 1; done &&
+      echo 'Ollama started. Pulling model qwen2.5-coder:1.5b (blocking)...' &&
+      curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5-coder:1.5b\", \"stream\": false}' &&
+      echo 'Model qwen2.5-coder:1.5b pulled successfully!'
+      "
+    networks:
+      - tanuki-network
+    dns:
+      - 8.8.8.8
 
 networks:
-  rin-network:
-    external: true
-    name: elyth_bridge_rin-network
+  tanuki-network:
+    driver: bridge
+
+volumes:
+  ollama_data:

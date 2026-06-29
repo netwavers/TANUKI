@@ -1,10 +1,8 @@
 # Build stage
 FROM rust:1.90-slim-bookworm AS builder
 
-# Install system dependencies
+# Install system dependencies (OpenSSL is excluded as we use rustls-tls)
 RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
     sqlite3 \
     libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -21,7 +19,6 @@ RUN cargo build --release -p tanuki-serving
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
-    libssl3 \
     sqlite3 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
