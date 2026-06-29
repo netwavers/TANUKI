@@ -336,3 +336,88 @@ impl<'a> SpeculativeTransaction<'a> {
         println!("  ✅ Speculative transaction committed.");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_db_init_and_nodes() -> Result<()> {
+        let db = TanukiDb {
+            conn: Connection::open_in_memory()?,
+        };
+        db.init()?;
+
+        db.insert_node(
+            "node_1",
+            "test.md",
+            Some("hash123"),
+            "doc/test",
+            "Test Node",
+            "Content",
+            "Summary",
+            "{}",
+            &[1.0, 2.0, 3.0],
+        )?;
+
+        let nodes = db.get_all_nodes()?;
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].id, "node_1");
+        assert_eq!(nodes[0].file_hash.as_deref(), Some("hash123"));
+
+        let nodes_with_emb = db.get_all_nodes_with_embedding()?;
+        assert_eq!(nodes_with_emb.len(), 1);
+        assert_eq!(nodes_with_emb[0].embedding, vec![1.0, 2.0, 3.0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_speculative_transaction() -> Result<()> {
+        let db = TanukiDb {
+            conn: Connection::open_in_memory()?,
+        };
+        db.init()?;
+
+        let mut tx = db.start_transaction();
+        tx.insert_node_speculative(
+            "spec_1",
+            "spec.md",
+            None,
+            "doc/spec",
+            "Spec Node",
+            "Spec Content",
+            "Spec Summary",
+            "{}",
+            &[0.1, 0.2],
+        )?;
+
+        let nodes = db.get_all_nodes()?;
+        assert_eq!(nodes.len(), 1);
+
+        tx.rollback()?;
+
+        let nodes = db.get_all_nodes()?;
+        assert_eq!(nodes.len(), 0);
+
+        let mut tx2 = db.start_transaction();
+        tx2.insert_node_speculative(
+            "spec_2",
+            "spec2.md",
+            None,
+            "doc/spec2",
+            "Spec Node 2",
+            "Content 2",
+            "Summary 2",
+            "{}",
+            &[0.3],
+        )?;
+        tx2.commit();
+
+        let nodes = db.get_all_nodes()?;
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].id, "spec_2");
+
+        Ok(())
+    }
+}
