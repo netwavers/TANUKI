@@ -62,21 +62,45 @@ pip install tanuki
 
 ---
 
-## 💾 5. データベース (knowledge.db / knowledge.bin) の初期構築
+## 💾 5. ドキュメントの用意とデータベース (knowledge.db / bin) の構築
 
-T.A.N.U.K.I. で検索対象となる知識ベース（SQLite の `knowledge.db` および FlatBuffers バイナリの `knowledge.bin`）は、ソースドキュメント（Markdown 等）からコンパイラを介して自律生成されます。
+T.A.N.U.K.I. で検索・圧縮対象となる知識ベース（SQLite の `knowledge.db` および FlatBuffers バイナリの `knowledge.bin`）は、Markdown 形式のソースドキュメントからコンパイラを介して生成されます。
+正しく「知識の木（Irminsul 構造）」としてインデックスさせるための、ドキュメントの用意とビルドの手順は以下の通りです。
 
-初期データベースファイルが存在しない場合でも、以下のいずれかのコマンドを実行することで、設定されたドキュメントフォルダをスキャンし、自動でテーブルスキーマの初期化（DDL発行）およびバイナリパッケージングを実行します。
+### ① インプットドキュメントの準備規則
+* **ファイル形式**: 必ず **`UTF-8`** エンコーディングで保存された Markdown（`.md`）形式で作成します。
+* **見出し構造 (ASTパース)**: 構造化エンジン（`tanuki-compiler`）が見出しレベル（`#`, `##`, `###`）を解釈して親子関係のツリーを構築するため、ドキュメント構造に沿って適切な階層見出しを使用してください。
+* **命名とタイトル制約 (重要)**: Windows/Linux のディレクトリ区切り文字との衝突を防ぐため、ファイル名および見出しのタイトルに **`/`（スラッシュ）などの特殊文字を含めない**でください（一時ファイル生成やパース時に `FileNotFoundError` などのクラッシュを引き起こします）。
 
-### 方法 A: 再構築スクリプトの実行 (推奨)
-```powershell
-python D:\Projects\PyProjects\Documents\Archive\Devlog\rebuild_tanuki.py
-```
+### ② ドキュメント管理 ＆ 差分ビルドフロー (InBox 経由)
+ドキュメントは直接対象フォルダへ配置するのではなく、一時的な投入バッファである **`InBox`** を経由して自動仕分け・再構築を行うのが標準ワークフローです。
 
-### 方法 B: Rust コンパイラによる直接ビルド・実行
-```powershell
-cargo run --bin tanuki-compiler -- compile
-```
+1. **InBox への投入**: 新しいドキュメントを `Documents/InBox/` ディレクトリへ配置します。
+2. **仕分けと再構築の実行**: `_maintenance` ディレクトリの仕分けマネージャを呼び出します。これにより、ルーティングルールに基づきファイルが適切なディレクトリへ移動し、同時にデータベースが自動コンパイルされます。
+   ```powershell
+   cd D:\Projects\PyProjects\_maintenance
+   # 仕分けの実行（適用）と TANUKI の自動差分コンパイル
+   python -m documents_manager apply --rebuild-tanuki
+   ```
+   * **ハッシュ整合性の保証**: 差分コンパイル時は、ドキュメント末尾の `<!-- Tanuki-Hash: <sha256> -->` 等の整合性が自動検証され、更新分のみが高速に packing されます。
+
+### ③ RAG（インデックス）対象の制御
+インデックスの対象にするかどうかのポリシーは、以下の設定ファイルで編集可能です。
+* **仕分けルーティングルール**: `Documents/documents_routing_rules.yaml`
+* **RAG コンパイルポリシー**: `Documents/documents_rag_policy.yaml`
+  * プライベートな創作メモなど、知識ベースに含めたくないファイルは RAG ポリシーにて `rag: false` に設定するか、対象外のディレクトリ（`02_Creative/` や `archive/` 等）へルーティングさせてください（※ `InBox` 直下のファイルは標準でインデックス対象外となります）。
+
+### ④ データベースの直接ビルド方法
+手動で明示的にデータベース（knowledge.db と knowledge.bin）を再構築・初期構築したい場合は、以下のいずれかのコマンドを実行します。
+
+* **再構築スクリプトによる実行 (推奨)**
+  ```powershell
+  python D:\Projects\PyProjects\Documents\Archive\Devlog\rebuild_tanuki.py
+  ```
+* **Rust コンパイラによる直接ビルド・コンパイル**
+  ```powershell
+  cargo run --bin tanuki-compiler -- compile
+  ```
 
 ---
 
