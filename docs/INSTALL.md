@@ -62,7 +62,25 @@ pip install tanuki
 
 ---
 
-## 🧪 5. テストランナーを用いた一括セットアップ ＆ 検証
+## 💾 5. データベース (knowledge.db / knowledge.bin) の初期構築
+
+T.A.N.U.K.I. で検索対象となる知識ベース（SQLite の `knowledge.db` および FlatBuffers バイナリの `knowledge.bin`）は、ソースドキュメント（Markdown 等）からコンパイラを介して自律生成されます。
+
+初期データベースファイルが存在しない場合でも、以下のいずれかのコマンドを実行することで、設定されたドキュメントフォルダをスキャンし、自動でテーブルスキーマの初期化（DDL発行）およびバイナリパッケージングを実行します。
+
+### 方法 A: 再構築スクリプトの実行 (推奨)
+```powershell
+python D:\Projects\PyProjects\Documents\Archive\Devlog\rebuild_tanuki.py
+```
+
+### 方法 B: Rust コンパイラによる直接ビルド・実行
+```powershell
+cargo run --bin tanuki-compiler -- compile
+```
+
+---
+
+## 🧪 6. テストランナーを用いた一括セットアップ ＆ 検証
 
 ローカル環境のビルド・依存関係・テストをワンクリックで実行するための統合テストランナーも用意されています。
 
@@ -74,7 +92,7 @@ python run_tests.py
 
 ---
 
-## 💡 6. 使い方 (Quick Start)
+## 💡 7. 使い方 (Quick Start)
 
 ### ① Python SDK を用いた API サーバーとの連携
 `tanuki-serving` API サーバーが起動している状態で、対話やコンテキスト探索を呼び出す基本的なコード例です。
