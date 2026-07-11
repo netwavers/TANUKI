@@ -72,35 +72,27 @@ T.A.N.U.K.I. で検索・圧縮対象となる知識ベース（SQLite の `know
 * **見出し構造 (ASTパース)**: 構造化エンジン（`tanuki-compiler`）が見出しレベル（`#`, `##`, `###`）を解釈して親子関係のツリーを構築するため、ドキュメント構造に沿って適切な階層見出しを使用してください。
 * **命名とタイトル制約 (重要)**: Windows/Linux のディレクトリ区切り文字との衝突を防ぐため、ファイル名および見出しのタイトルに **`/`（スラッシュ）などの特殊文字を含めない**でください（一時ファイル生成やパース時に `FileNotFoundError` などのクラッシュを引き起こします）。
 
-### ② ドキュメント管理 ＆ 差分ビルドフロー (InBox 経由)
-ドキュメントは直接対象フォルダへ配置するのではなく、一時的な投入バッファである **`InBox`** を経由して自動仕分け・再構築を行うのが標準ワークフローです。
+### ② ドキュメントの配置 ＆ 差分ビルドフロー
 
-1. **InBox への投入**: 新しいドキュメントを `Documents/InBox/` ディレクトリへ配置します。
-2. **仕分けと再構築の実行**: `_maintenance` ディレクトリの仕分けマネージャを呼び出します。これにより、ルーティングルールに基づきファイルが適切なディレクトリへ移動し、同時にデータベースが自動コンパイルされます。
+1. **ドキュメントの配置**: インデックス対象の Markdown ファイルを、設定で指定したスキャン対象ディレクトリ（デフォルトはリポジトリ内の `./documents` フォルダ）に配置または更新します。
+2. **再構築コマンドの実行**: ドキュメントを追加または編集したら、以下の再構築コマンドを実行して、差分更新（Packing AST）を適用します。
    ```powershell
-   cd D:\Projects\PyProjects\_maintenance
-   # 仕分けの実行（適用）と TANUKI の自動差分コンパイル
-   python -m documents_manager apply --rebuild-tanuki
+   # 差分更新を適用してデータベースを再構築します
+   python rebuild_tanuki.py
    ```
-   * **ハッシュ整合性の保証**: 差分コンパイル時は、ドキュメント末尾の `<!-- Tanuki-Hash: <sha256> -->` 等の整合性が自動検証され、更新分のみが高速に packing されます。
+   * **ハッシュによる高速差分ビルド**: `tanuki-compiler` は、ドキュメントの更新日時（mtime）やファイル内容のハッシュ値を追跡し、変更があったファイルのみを高速に差分コンパイルして `knowledge.db` および `knowledge.bin` を更新します。
 
 ### ③ RAG（インデックス）対象の制御
-インデックスの対象にするかどうかのポリシーは、以下の設定ファイルで編集可能です。
-* **仕分けルーティングルール**: `Documents/documents_routing_rules.yaml`
-* **RAG コンパイルポリシー**: `Documents/documents_rag_policy.yaml`
-  * プライベートな創作メモなど、知識ベースに含めたくないファイルは RAG ポリシーにて `rag: false` に設定するか、対象外のディレクトリ（`02_Creative/` や `archive/` 等）へルーティングさせてください（※ `InBox` 直下のファイルは標準でインデックス対象外となります）。
+スキャン対象のディレクトリやモデル設定などは、以下のファイルでカスタマイズ可能です。
+* **環境設定ファイル**: `.env` (または `tanuki_config.py` 内)
+  - `TANUKI_TARGET_DIRS`: スキャン対象とするディレクトリを指定（例: `TANUKI_TARGET_DIRS=./documents`）。
+  - `TANUKI_MODEL`: 構造化および推論に使用する LLM モデルを指定。
 
-### ④ データベースの直接ビルド方法
-手動で明示的にデータベース（knowledge.db と knowledge.bin）を再構築・初期構築したい場合は、以下のいずれかのコマンドを実行します。
-
-* **再構築スクリプトによる実行 (推奨)**
-  ```powershell
-  python D:\Projects\PyProjects\Documents\Archive\Devlog\rebuild_tanuki.py
-  ```
-* **Rust コンパイラによる直接ビルド・コンパイル**
-  ```powershell
-  cargo run --bin tanuki-compiler -- compile
-  ```
+### ④ データベースの直接ビルド方法 (Rust)
+Python のラッパースクリプトを通さず、Cargo 経由でコンパイラを直接叩いて再構築・初期構築を行うことも可能です。
+```powershell
+cargo run --bin tanuki-compiler -- compile
+```
 
 ---
 
