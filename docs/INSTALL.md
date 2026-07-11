@@ -80,7 +80,48 @@ cargo run --bin tanuki-compiler -- compile
 
 ---
 
-## 🧪 6. テストランナーを用いた一括セットアップ ＆ 検証
+## 📡 6. API サーバー (tanuki-serving) の設定と起動
+
+T.A.N.U.K.I. 検索エンジンへのクエリを処理し、外部 SDK やエージェントとの橋渡しを行う Rust 製の API サーバーを設定・起動する手順です。
+
+### ① 設定ファイル (.env) の作成
+プロジェクトルートにある `.env.example` をコピーして `.env` を作成し、環境に合わせて各変数を設定します。
+```bash
+# 設定例のコピー
+cp .env.example .env
+```
+主要な設定項目：
+* `TANUKI_API_BASE`: クライアントやブリッジが接続する API サーバーのアドレス。ローカル開発時は `http://localhost:3000` に設定します。
+* `TANUKI_MODEL`: 投機的対話や要約に使用するローカル LLM のモデル名（例: `gemma4:e2b`）。
+
+### ② 起動方法 A: Cargo による直接起動 (開発・ローカル検証)
+Cargo を経由してローカルで直接 API サーバーを立ち上げます。
+```bash
+# リポジトリルートから起動する場合
+cargo run --package tanuki-serving
+
+# または、ディレクトリに移動して起動する場合
+cd tanuki-serving
+cargo run
+```
+*※ 起動すると、デフォルトで **ポート `3000`** (`http://0.0.0.0:3000`) にて HTTP リクエストの受付を開始します。*
+
+**動作確認:**
+ブラウザまたは `curl` を用いて、`http://localhost:3000/health` にアクセスし、以下の応答が返れば正常起動しています。
+```
+TANUKI Serving is online! 🐾
+```
+
+### ③ 起動方法 B: Docker Compose による起動 (本番・統合環境向け)
+API サーバー、Redis キャッシュ、ダッシュボード UI などを含めた統合パッケージ一式をバックグラウンドで一括起動します。
+```bash
+docker compose up --build -d
+```
+*※ Docker 構成では、Nginx リバースプロキシがフロントエンド（UI）の配信と、API サーバー（ポート 3001）へのルーティングを自動制御します。*
+
+---
+
+## 🧪 7. テストランナーを用いた一括セットアップ ＆ 検証
 
 ローカル環境のビルド・依存関係・テストをワンクリックで実行するための統合テストランナーも用意されています。
 
@@ -92,7 +133,7 @@ python run_tests.py
 
 ---
 
-## 💡 7. 使い方 (Quick Start)
+## 💡 8. 使い方 (Quick Start)
 
 ### ① Python SDK を用いた API サーバーとの連携
 `tanuki-serving` API サーバーが起動している状態で、対話やコンテキスト探索を呼び出す基本的なコード例です。
