@@ -10,5 +10,11 @@
     "display_name": "Gemma 4 Local (Default)",
     "model_name": "gemma4:e4b",
     "provider": "Ollama"
+  },
+  "qwen2.5-coder:1.5b": {
+    "base_url": "http://localhost:11434",
+    "display_name": "Qwen 2.5 Coder 1.5B (Local)",
+    "model_name": "qwen2.5-coder:1.5b",
+    "provider": "Ollama"
   }
 }

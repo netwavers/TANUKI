@@ -1,3 +1,21 @@
+// Copyright (c) 2026 かぜまる (Kazemaru) / Antigravity AI.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// ---
+// 🐾 T.A.N.U.K.I. Project - Flat-AST Context Architecture Layer
+// "バグは剪定されるべき枝葉、ハードコードは偽りの果実です。"
+
 use rusqlite::{Connection, Result};
 use serde::Serialize;
 use std::path::Path;
@@ -8,9 +26,9 @@ pub struct TanukiDb {
 
 #[derive(Debug, Clone)]
 pub enum UndoOp {
-    DeleteNode(String), // Node ID
-    DeleteFileMeta(String), // File Path
-    DeleteCluster(String), // Cluster ID
+    DeleteNode(String),                 // Node ID
+    DeleteFileMeta(String),             // File Path
+    DeleteCluster(String),              // Cluster ID
     DeleteLink(String, String, String), // source_id, target_id, link_type
 }
 
@@ -54,6 +72,8 @@ pub struct Cluster {
 impl TanukiDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let conn = Connection::open(path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(10))?;
+        let _ = conn.pragma_update(None, "journal_mode", &"WAL");
         let db = Self { conn };
         db.init()?;
         Ok(db)
@@ -79,13 +99,15 @@ impl TanukiDb {
         // カラムの追加チェック (マイグレーション)
         {
             let mut stmt = self.conn.prepare("PRAGMA table_info(nodes)")?;
-            let columns: Vec<String> = stmt.query_map([], |row| row.get(1))?
+            let columns: Vec<String> = stmt
+                .query_map([], |row| row.get(1))?
                 .filter_map(|r| r.ok())
                 .collect();
-            
+
             if !columns.contains(&"file_hash".to_string()) {
                 println!("  🛠 Migrating database: Adding 'file_hash' column to 'nodes' table...");
-                self.conn.execute("ALTER TABLE nodes ADD COLUMN file_hash TEXT", [])?;
+                self.conn
+                    .execute("ALTER TABLE nodes ADD COLUMN file_hash TEXT", [])?;
             }
         }
 
@@ -125,8 +147,20 @@ impl TanukiDb {
         Ok(())
     }
 
-    pub fn insert_node(&self, id: &str, source_path: &str, file_hash: Option<&str>, context_path: &str, title: &str, content: &str, summary: &str, metadata: &str, embedding: &[f32]) -> Result<()> {
-        let embedding_blob = bincode::serialize(embedding).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e))?;
+    pub fn insert_node(
+        &self,
+        id: &str,
+        source_path: &str,
+        file_hash: Option<&str>,
+        context_path: &str,
+        title: &str,
+        content: &str,
+        summary: &str,
+        metadata: &str,
+        embedding: &[f32],
+    ) -> Result<()> {
+        let embedding_blob = bincode::serialize(embedding)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e))?;
         self.conn.execute(
             "INSERT OR REPLACE INTO nodes (id, source_path, file_hash, context_path, title, content, summary, metadata, embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             (id, source_path, file_hash, context_path, title, content, summary, metadata, embedding_blob),
@@ -156,15 +190,40 @@ impl TanukiDb {
         Ok(nodes)
     }
 
+    pub fn get_node(&self, id: &str) -> Result<Option<KnowledgeNode>> {
+        let mut stmt = self.conn.prepare("SELECT id, source_path, file_hash, context_path, title, content, summary, metadata FROM nodes WHERE id = ?1")?;
+        let mut rows = stmt.query_map([id], |row| {
+            Ok(KnowledgeNode {
+                id: row.get(0)?,
+                source_path: row.get(1)?,
+                file_hash: row.get(2)?,
+                context_path: row.get(3)?,
+                title: row.get(4)?,
+                content: row.get(5)?,
+                summary: row.get(6)?,
+                metadata: row.get(7)?,
+            })
+        })?;
+
+        if let Some(node_result) = rows.next() {
+            Ok(Some(node_result?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn delete_nodes_by_source(&self, source_path: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM nodes WHERE source_path = ?1", [source_path])?;
+        self.conn
+            .execute("DELETE FROM nodes WHERE source_path = ?1", [source_path])?;
         Ok(())
     }
 
     // --- File Meta ---
 
     pub fn get_file_mtime(&self, path: &str) -> Result<Option<u64>> {
-        let mut stmt = self.conn.prepare("SELECT mtime FROM file_meta WHERE path = ?1")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT mtime FROM file_meta WHERE path = ?1")?;
         let mut rows = stmt.query([path])?;
         if let Some(row) = rows.next()? {
             Ok(Some(row.get(0)?))
@@ -182,7 +241,8 @@ impl TanukiDb {
     }
 
     pub fn delete_file_meta(&self, path: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM file_meta WHERE path = ?1", [path])?;
+        self.conn
+            .execute("DELETE FROM file_meta WHERE path = ?1", [path])?;
         Ok(())
     }
 
@@ -203,7 +263,9 @@ impl TanukiDb {
     }
 
     pub fn get_all_clusters(&self) -> Result<Vec<Cluster>> {
-        let mut stmt = self.conn.prepare("SELECT id, parent_id, title, summary, navigation_criteria FROM clusters")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, parent_id, title, summary, navigation_criteria FROM clusters")?;
         let cluster_iter = stmt.query_map([], |row| {
             Ok(Cluster {
                 id: row.get(0)?,
@@ -221,7 +283,14 @@ impl TanukiDb {
         Ok(clusters)
     }
 
-    pub fn insert_cluster(&self, id: &str, parent_id: &str, title: &str, summary: &str, criteria: &str) -> Result<()> {
+    pub fn insert_cluster(
+        &self,
+        id: &str,
+        parent_id: &str,
+        title: &str,
+        summary: &str,
+        criteria: &str,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO clusters (id, parent_id, title, summary, navigation_criteria) VALUES (?1, ?2, ?3, ?4, ?5)",
             (id, parent_id, title, summary, criteria),
@@ -229,7 +298,13 @@ impl TanukiDb {
         Ok(())
     }
 
-    pub fn insert_link(&self, source_id: &str, target_id: &str, link_type: &str, strength: f32) -> Result<()> {
+    pub fn insert_link(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        link_type: &str,
+        strength: f32,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO links (source_id, target_id, link_type, strength) VALUES (?1, ?2, ?3, ?4)",
             (source_id, target_id, link_type, strength),
@@ -237,7 +312,7 @@ impl TanukiDb {
         Ok(())
     }
 
-     pub fn get_link_count(&self) -> Result<i64> {
+    pub fn get_link_count(&self) -> Result<i64> {
         let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM links")?;
         stmt.query_row([], |row| row.get(0))
     }
@@ -254,10 +329,15 @@ impl TanukiDb {
             let summary: String = row.get(6)?;
             let metadata: String = row.get(7)?;
             let embedding_blob: Vec<u8> = row.get(8)?;
-            
-            let embedding: Vec<f32> = bincode::deserialize(&embedding_blob)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Blob, Box::new(e)))?;
-                
+
+            let embedding: Vec<f32> = bincode::deserialize(&embedding_blob).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Blob,
+                    Box::new(e),
+                )
+            })?;
+
             Ok(KnowledgeNodeWithEmbedding {
                 node: KnowledgeNode {
                     id,
@@ -280,6 +360,37 @@ impl TanukiDb {
         Ok(nodes)
     }
 
+    pub fn delete_files_and_nodes_in_transaction(&self, paths: &[String]) -> Result<()> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+        self.conn.execute("BEGIN TRANSACTION", [])?;
+
+        let run_deletes = || -> Result<()> {
+            let mut node_stmt = self
+                .conn
+                .prepare("DELETE FROM nodes WHERE source_path = ?1")?;
+            let mut meta_stmt = self.conn.prepare("DELETE FROM file_meta WHERE path = ?1")?;
+
+            for path in paths {
+                node_stmt.execute([path])?;
+                meta_stmt.execute([path])?;
+            }
+            Ok(())
+        };
+
+        match run_deletes() {
+            Ok(_) => {
+                self.conn.execute("COMMIT TRANSACTION", [])?;
+                Ok(())
+            }
+            Err(e) => {
+                let _ = self.conn.execute("ROLLBACK TRANSACTION", []);
+                Err(e)
+            }
+        }
+    }
+
     // --- Speculative Transactions ---
 
     pub fn start_transaction(&self) -> SpeculativeTransaction<'_> {
@@ -291,36 +402,83 @@ impl TanukiDb {
 }
 
 impl<'a> SpeculativeTransaction<'a> {
-    pub fn insert_node_speculative(&mut self, id: &str, source_path: &str, file_hash: Option<&str>, context_path: &str, title: &str, content: &str, summary: &str, metadata: &str, embedding: &[f32]) -> Result<()> {
-        self.db.insert_node(id, source_path, file_hash, context_path, title, content, summary, metadata, embedding)?;
+    pub fn insert_node_speculative(
+        &mut self,
+        id: &str,
+        source_path: &str,
+        file_hash: Option<&str>,
+        context_path: &str,
+        title: &str,
+        content: &str,
+        summary: &str,
+        metadata: &str,
+        embedding: &[f32],
+    ) -> Result<()> {
+        self.db.insert_node(
+            id,
+            source_path,
+            file_hash,
+            context_path,
+            title,
+            content,
+            summary,
+            metadata,
+            embedding,
+        )?;
         self.undo_stack.push(UndoOp::DeleteNode(id.to_string()));
         Ok(())
     }
 
-    pub fn insert_cluster_speculative(&mut self, id: &str, parent_id: &str, title: &str, summary: &str, criteria: &str) -> Result<()> {
-        self.db.insert_cluster(id, parent_id, title, summary, criteria)?;
+    pub fn insert_cluster_speculative(
+        &mut self,
+        id: &str,
+        parent_id: &str,
+        title: &str,
+        summary: &str,
+        criteria: &str,
+    ) -> Result<()> {
+        self.db
+            .insert_cluster(id, parent_id, title, summary, criteria)?;
         self.undo_stack.push(UndoOp::DeleteCluster(id.to_string()));
         Ok(())
     }
 
-    pub fn insert_link_speculative(&mut self, source_id: &str, target_id: &str, link_type: &str, strength: f32) -> Result<()> {
-        self.db.insert_link(source_id, target_id, link_type, strength)?;
-        self.undo_stack.push(UndoOp::DeleteLink(source_id.to_string(), target_id.to_string(), link_type.to_string()));
+    pub fn insert_link_speculative(
+        &mut self,
+        source_id: &str,
+        target_id: &str,
+        link_type: &str,
+        strength: f32,
+    ) -> Result<()> {
+        self.db
+            .insert_link(source_id, target_id, link_type, strength)?;
+        self.undo_stack.push(UndoOp::DeleteLink(
+            source_id.to_string(),
+            target_id.to_string(),
+            link_type.to_string(),
+        ));
         Ok(())
     }
 
     pub fn rollback(mut self) -> Result<()> {
-        println!("  ⏪ Rolling back speculative transaction ({} operations)...", self.undo_stack.len());
+        println!(
+            "  ⏪ Rolling back speculative transaction ({} operations)...",
+            self.undo_stack.len()
+        );
         while let Some(op) = self.undo_stack.pop() {
             match op {
                 UndoOp::DeleteNode(id) => {
-                    self.db.conn.execute("DELETE FROM nodes WHERE id = ?1", [id])?;
+                    self.db
+                        .conn
+                        .execute("DELETE FROM nodes WHERE id = ?1", [id])?;
                 }
                 UndoOp::DeleteFileMeta(path) => {
                     self.db.delete_file_meta(&path)?;
                 }
                 UndoOp::DeleteCluster(id) => {
-                    self.db.conn.execute("DELETE FROM clusters WHERE id = ?1", [id])?;
+                    self.db
+                        .conn
+                        .execute("DELETE FROM clusters WHERE id = ?1", [id])?;
                 }
                 UndoOp::DeleteLink(sid, tid, lt) => {
                     self.db.conn.execute("DELETE FROM links WHERE source_id = ?1 AND target_id = ?2 AND link_type = ?3", (sid, tid, lt))?;

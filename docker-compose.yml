@@ -51,8 +51,6 @@ services:
     #           capabilities: [gpu]
     networks:
       - tanuki-network
-    dns:
-      - 8.8.8.8
 
   ollama-puller:
     image: curlimages/curl:latest
@@ -70,8 +68,6 @@ services:
       "
     networks:
       - tanuki-network
-    dns:
-      - 8.8.8.8
 
 networks:
   tanuki-network:

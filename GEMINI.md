@@ -42,3 +42,25 @@
 - スキル詳細: `D:\Projects\PyProjects\_agent\skills\TanukiJournal\SKILL.md`
 - 開発日誌保管場所: `D:\Projects\PyProjects\Documents\Archive\Devlog/`
 - ナビゲーション: `D:\Projects\PyProjects\_agent\skills\WorkspaceNavigator/`
+
+## 📁 ドキュメントヴォルト管理 (Documents Vault Management)
+ドキュメントヴォルト（[Documents](file:///D:/Projects/PyProjects/Documents)）は、一時的な入口（`InBox`）を経由してルールに基づき自動仕分けされるシステムになっています。
+詳細およびルールについては [DOCUMENTS_MANAGER.md](file:///D:/Projects/PyProjects/Documents/DOCUMENTS_MANAGER.md) を参照してください。
+
+- **仕分けの実行とTANUKI再構築**:
+  `D:\Projects\PyProjects\_maintenance` に移動し、以下のコマンドで仕分けプランを確認・適用できます。
+  ```powershell
+  cd D:\Projects\PyProjects\_maintenance
+  # ステータスと仕分け対象の確認
+  python -m documents_manager status
+  python -m documents_manager plan --text
+  # 仕分けの実行（適用）とTANUKIの自動再構築
+  python -m documents_manager apply --rebuild-tanuki
+  ```
+- **ルールの追加・編集**:
+  - 仕分けのルーティングルール: [documents_routing_rules.yaml](file:///D:/Projects/PyProjects/Documents/documents_routing_rules.yaml)
+  - RAG（TANUKI）コンパイルポリシー: [documents_rag_policy.yaml](file:///D:/Projects/PyProjects/Documents/documents_rag_policy.yaml)
+- **注意点**:
+  - 新規作成したドキュメントは、直接格納先に置くか、または `Documents/InBox` に投入して仕分けマネージャを実行してください。
+  - `InBox` 配下のファイルは RAG のインデックス対象外となります。
+

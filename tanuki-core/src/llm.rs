@@ -1,7 +1,25 @@
+// Copyright (c) 2026 かぜまる (Kazemaru) / Antigravity AI.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// ---
+// 🐾 T.A.N.U.K.I. Project - Flat-AST Context Architecture Layer
+// "バグは剪定されるべき枝葉、ハードコードは偽りの果実です。"
+
+use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -73,23 +91,29 @@ pub struct ChatModelConfig {
 }
 
 /// models_config.json から設定を読み込み、対応する LlmProvider を生成する
-pub fn load_provider(config_path: &str, model_name: &str) -> Result<Box<dyn LlmProvider>> {
+pub fn load_provider(
+    config_path: &str,
+    model_name: &str,
+) -> Result<Box<dyn LlmProvider + Send + Sync>> {
     let mut file = File::open(config_path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
     // オブジェクトマップか配列リストかを柔軟にデシリアライズ
-    let config: ChatModelConfig = if let Ok(map) = serde_json::from_str::<HashMap<String, ChatModelConfig>>(&contents) {
-        map.get(model_name)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Model '{}' not found in models config map", model_name))?
-    } else if let Ok(list) = serde_json::from_str::<Vec<ChatModelConfig>>(&contents) {
-        list.into_iter()
-            .find(|m| m.model_name == model_name)
-            .ok_or_else(|| anyhow::anyhow!("Model '{}' not found in models config list", model_name))?
-    } else {
-        anyhow::bail!("Invalid models config format in {}", config_path);
-    };
+    let config: ChatModelConfig =
+        if let Ok(map) = serde_json::from_str::<HashMap<String, ChatModelConfig>>(&contents) {
+            map.get(model_name).cloned().ok_or_else(|| {
+                anyhow::anyhow!("Model '{}' not found in models config map", model_name)
+            })?
+        } else if let Ok(list) = serde_json::from_str::<Vec<ChatModelConfig>>(&contents) {
+            list.into_iter()
+                .find(|m| m.model_name == model_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Model '{}' not found in models config list", model_name)
+                })?
+        } else {
+            anyhow::bail!("Invalid models config format in {}", config_path);
+        };
 
     match config.provider {
         ModelProvider::Gemini => {
@@ -101,7 +125,9 @@ pub fn load_provider(config_path: &str, model_name: &str) -> Result<Box<dyn LlmP
             Ok(Box::new(GeminiClient::new(api_key, model)))
         }
         ModelProvider::Ollama | ModelProvider::Local => {
-            let base_url = config.base_url.unwrap_or_else(|| "http://localhost:11434".to_string());
+            let base_url = config
+                .base_url
+                .unwrap_or_else(|| "http://localhost:11434".to_string());
             // API のパス調整 (/v1などが末尾にある場合はトリムしてOllamaネイティブのベースに合わせる)
             let clean_url = if base_url.ends_url_with_v1() {
                 base_url.trim_end_matches("/v1").to_string()
@@ -111,10 +137,16 @@ pub fn load_provider(config_path: &str, model_name: &str) -> Result<Box<dyn LlmP
                 base_url
             };
             let model = config.model_name;
-            Ok(Box::new(OllamaClient::new(clean_url, model)))
+            let keep_alive = std::env::var("OLLAMA_KEEP_ALIVE").unwrap_or_else(|_| "0".to_string());
+            Ok(Box::new(
+                OllamaClient::new(clean_url, model).with_keep_alive(&keep_alive),
+            ))
         }
         _ => {
-            anyhow::bail!("Provider '{:?}' is not yet supported in Rust core", config.provider);
+            anyhow::bail!(
+                "Provider '{:?}' is not yet supported in Rust core",
+                config.provider
+            );
         }
     }
 }
@@ -197,9 +229,12 @@ impl LlmProvider for GeminiClient {
 
         let resp = self.client.post(&url).json(&body).send().await?;
         let json: serde_json::Value = resp.json().await?;
-        
+
         if json["embedding"]["values"].is_null() {
-            anyhow::bail!("Gemini Embedding API returned null values. Response: {:?}", json);
+            anyhow::bail!(
+                "Gemini Embedding API returned null values. Response: {:?}",
+                json
+            );
         }
 
         let embedding: Vec<f32> = serde_json::from_value(json["embedding"]["values"].clone())?;
@@ -225,7 +260,7 @@ impl OllamaClient {
             client: Client::new(),
             base_url,
             model,
-            keep_alive: "5m".to_string(),
+            keep_alive: "0".to_string(),
         }
     }
 
@@ -250,9 +285,12 @@ impl LlmProvider for OllamaClient {
         let resp = self.client.post(&url).json(&body).send().await?;
         let json: serde_json::Value = resp.json().await?;
 
-        let text = json["response"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Failed to parse OllamaCenter response. Raw JSON: {:?}", json))?;
+        let text = json["response"].as_str().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to parse OllamaCenter response. Raw JSON: {:?}",
+                json
+            )
+        })?;
 
         Ok(text.to_string())
     }
@@ -276,7 +314,12 @@ impl LlmProvider for OllamaClient {
 
         let embedding = json["embedding"]
             .as_array()
-            .ok_or_else(|| anyhow::anyhow!("Failed to parse OllamaCenter embedding response: {:?}", json))?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to parse OllamaCenter embedding response: {:?}",
+                    json
+                )
+            })?
             .iter()
             .map(|v| v.as_f64().unwrap_or(0.0) as f32)
             .collect::<Vec<f32>>();
@@ -286,7 +329,7 @@ impl LlmProvider for OllamaClient {
 
     async fn unload(&self) -> Result<()> {
         let url = format!("{}/api/generate", self.base_url);
-        
+
         let body_main = serde_json::json!({
             "model": self.model,
             "prompt": "",
@@ -306,4 +349,3 @@ impl LlmProvider for OllamaClient {
         Ok(())
     }
 }
-

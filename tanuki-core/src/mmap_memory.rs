@@ -1,35 +1,57 @@
-use anyhow::{Result, Context};
+// Copyright (c) 2026 かぜまる (Kazemaru) / Antigravity AI.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// ---
+// 🐾 T.A.N.U.K.I. Project - Flat-AST Context Architecture Layer
+// "バグは剪定されるべき枝葉、ハードコードは偽りの果実です。"
+
+use crate::schema::get_root_as_memory_root;
+use anyhow::{Context, Result};
 use arc_swap::ArcSwap;
-use memmap2::Mmap;
 use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
-use crate::schema::get_root_as_memory_root;
 
 pub struct MmapMemoryManager {
-    // RCU-based active memory mapping
-    active_mmap: ArcSwap<Mmap>,
+    // RCU-based active memory data in RAM
+    active_data: ArcSwap<Vec<u8>>,
 }
 
 impl MmapMemoryManager {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = File::open(path).context("Failed to open memory file")?;
-        let mmap = unsafe { Mmap::map(&file) }.context("Failed to mmap file")?;
+        let mut file = File::open(path).context("Failed to open memory file")?;
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)
+            .context("Failed to read memory file")?;
         Ok(Self {
-            active_mmap: ArcSwap::from_pointee(mmap),
+            active_data: ArcSwap::from_pointee(data),
         })
     }
 
     pub fn update_mapping<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let file = File::open(path).context("Failed to open memory file for update")?;
-        let mmap = unsafe { Mmap::map(&file) }.context("Failed to mmap file")?;
-        self.active_mmap.store(Arc::new(mmap));
+        let mut file = File::open(path).context("Failed to open memory file for update")?;
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)
+            .context("Failed to read memory file for update")?;
+        self.active_data.store(Arc::new(data));
         Ok(())
     }
 
     pub fn search(&self, query_vector: &[f32; 768], top_k: usize) -> Result<Vec<(u64, f32)>> {
-        let mmap_guard = self.active_mmap.load();
-        let mmap_data = &**mmap_guard;
+        let data_guard = self.active_data.load();
+        let mmap_data = &**data_guard;
 
         let root = get_root_as_memory_root(mmap_data);
         let nodes = root.active_nodes().context("No active nodes found")?;
@@ -41,14 +63,14 @@ impl MmapMemoryManager {
         while i < nodes.len() {
             let node = nodes.get(i);
             let mut final_score = 0.0;
-            
+
             if let Some(concept) = node.concept() {
                 if let Some(v_vec) = concept.v() {
                     // MRL: First 64 dimensions
                     let mut score = 0.0;
                     let mut norm_a = 0.0;
                     let mut norm_b = 0.0;
-                    
+
                     for j in 0..64 {
                         let val_b = v_vec.get(j);
                         let val_a = query_vector[j];
@@ -56,7 +78,7 @@ impl MmapMemoryManager {
                         norm_a += val_a * val_a;
                         norm_b += val_b * val_b;
                     }
-                    
+
                     final_score = if norm_a == 0.0 || norm_b == 0.0 {
                         0.0
                     } else {
@@ -90,7 +112,7 @@ impl MmapMemoryManager {
                     let mut score = 0.0;
                     let mut norm_a = 0.0;
                     let mut norm_b = 0.0;
-                    
+
                     // Full 768 dimensions
                     let limit = std::cmp::min(v_vec.len(), 768);
                     for j in 0..limit {
@@ -100,13 +122,13 @@ impl MmapMemoryManager {
                         norm_a += val_a * val_a;
                         norm_b += val_b * val_b;
                     }
-                    
+
                     let final_score = if norm_a == 0.0 || norm_b == 0.0 {
                         0.0
                     } else {
                         score / (norm_a.sqrt() * norm_b.sqrt())
                     };
-                    
+
                     fine_results.push((node.node_id(), final_score));
                 }
             }

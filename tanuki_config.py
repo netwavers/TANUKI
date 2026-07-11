@@ -64,7 +64,7 @@ def load_env():
             "TANUKI_MODEL": "gemma4:e4b",
             "TANUKI_MODELS_CONFIG": "config/models_config.json",
             "TANUKI_NO_REDUCE": "1",
-            "TANUKI_TARGET_DIRS": "../Documents/InBox,../Documents/Archive/Devlog,../Documents/Archive/Media,../Documents/Archive/Specifications"
+            "TANUKI_TARGET_DIRS": "../Documents/Archive/Devlog,../Documents/Archive/Specifications,../Documents/Archive/Media,../Documents/Technical,../Documents/01_Projects,../Documents/Active"
         }
     with open(ENV_FILE, "r", encoding="utf-8") as f:
         for line in f:

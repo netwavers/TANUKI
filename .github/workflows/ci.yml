@@ -1,0 +1,107 @@
+name: 🐾 T.A.N.U.K.I. CI/CD - Core Compilation Engine
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  # 🌲 監査・テストフェーズ (ほむら監査領域)
+  test-and-audit:
+    name: 🕵️ Rust/Python Unified Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain (1.80+ for repr(C, align(16)))
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Setup Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tanuki-core -> target
+            tanuki-py -> target
+
+      - name: Verify Code Style
+        run: |
+          cargo fmt --manifest-path tanuki-core/Cargo.toml -- --check
+          cargo fmt --manifest-path tanuki-py/Cargo.toml -- --check
+
+      - name: Execute Rust Core & SubNode Tests (Unit Only)
+        run: |
+          cargo test --manifest-path tanuki-core/Cargo.toml --lib --verbose
+
+  # 🚀 クロスコンパイルビルドフェーズ (Maturin多環境パッケージ化)
+  build-wheels:
+    name: 📦 Build Wheels on ${{ matrix.os }} (${{ matrix.target }})
+    needs: test-and-audit
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 🐧 Linux 64bit (Manylinux 規格適合)
+          - os: ubuntu-latest
+            target: x86_64
+          # 🪟 Windows 64bit
+          - os: windows-latest
+            target: x64
+          # 🍏 macOS Intel & Apple Silicon (Universal2)
+          - os: macos-13
+            target: x86_64
+          - os: macos-14
+            target: aarch64
+
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build Wheel via Maturin-Action
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --manifest-path tanuki-py/Cargo.toml
+          sccache: 'true'
+          manylinux: auto
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist
+
+  # 🎨 パブリックリリースフェーズ
+  release-package:
+    name: 🚀 Publish to PyPI Marketplace
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-wheels
+    permissions:
+      id-token: write # 2026年標準の OIDC トラステッド・パブリッシャー認証に必須
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Publish Package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+          # Note: PyPI 側の Trusted Publishers 設定により、APIトークンのハードコードは不要（完全安全）

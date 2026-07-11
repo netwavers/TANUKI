@@ -1,19 +1,39 @@
-use tanuki_core::schema::{MemoryRootBuilder, ASTNodeBuilder, ConceptVectorBuilder, finish_memory_root_buffer};
-use tanuki_core::MmapMemoryManager;
+// Copyright (c) 2026 かぜまる (Kazemaru) / Antigravity AI.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// ---
+// 🐾 T.A.N.U.K.I. Project - Flat-AST Context Architecture Layer
+// "バグは剪定されるべき枝葉、ハードコードは偽りの果実です。"
+
 use flatbuffers::FlatBufferBuilder;
 use std::fs::File;
 use std::io::Write;
+use tanuki_core::schema::{
+    finish_memory_root_buffer, ASTNodeBuilder, ConceptVectorBuilder, MemoryRootBuilder,
+};
+use tanuki_core::MmapMemoryManager;
 
 fn main() -> anyhow::Result<()> {
     println!("🧪 Testing Irminsul V5 (Pre-order Tree & Subtree Skip Optimization)...");
 
     let path = "test_memory.bin";
-    
+
     // 1. テストデータの作成 (FlatBuffers)
     let mut fbb = FlatBufferBuilder::new();
-    
+
     let mut node_offsets = Vec::new();
-    
+
     // 木構造テストデータ定義：
     // Node 0 (Root) [descendants: 5, children: 2]
     //   Node 1 (Child A) [descendants: 2, children: 2]
@@ -34,14 +54,14 @@ fn main() -> anyhow::Result<()> {
         (6, 6, 1, 1, "Root 2"),
         (7, 6, 0, 0, "Child C"),
     ];
-    
+
     for (i, parent_id, child_count, descendant_count, title_str) in test_nodes {
         let mut v = [0.0f32; 768];
         // i番目の次元に1.0を立てる
         if i < 768 {
             v[i] = 1.0;
         }
-        
+
         // 探索パス疎通のための類似度重み付け (スキップしきい値 0.25 を越えるようにする)
         if i == 0 {
             v[5] = 0.4; // Node 5 のクエリを Root 1 でスキップさせない
@@ -50,16 +70,16 @@ fn main() -> anyhow::Result<()> {
         if i == 4 {
             v[5] = 0.4; // Node 5 のクエリを Child B でスキップさせない
         }
-        
+
         let v_offset = fbb.create_vector(&v);
-        
+
         let mut cv_builder = ConceptVectorBuilder::new(&mut fbb);
         cv_builder.add_v(v_offset);
         let cv = cv_builder.finish();
-        
+
         let logic = fbb.create_string(&format!("Node Logic {}", i));
         let title = fbb.create_string(title_str);
-        
+
         let mut node_builder = ASTNodeBuilder::new(&mut fbb);
         node_builder.add_node_id(i as u64);
         node_builder.add_parent_id(parent_id as u64);
@@ -70,16 +90,16 @@ fn main() -> anyhow::Result<()> {
         node_builder.add_raw_logic(logic);
         node_offsets.push(node_builder.finish());
     }
-    
+
     let nodes_vec = fbb.create_vector(&node_offsets);
-    
+
     let mut root_builder = MemoryRootBuilder::new(&mut fbb);
     root_builder.add_version(1);
     root_builder.add_active_nodes(nodes_vec);
     let root = root_builder.finish();
-    
+
     finish_memory_root_buffer(&mut fbb, root);
-    
+
     let mut file = File::create(path)?;
     file.write_all(fbb.finished_data())?;
     println!("  ✅ Test binary created: {}", path);
@@ -90,9 +110,9 @@ fn main() -> anyhow::Result<()> {
 
     // テスト1: 直交概念でNode 5を探す（Child B配下。スキップされず見つかるか？）
     let mut query_5 = [0.0f32; 768];
-    query_5[5] = 1.0; 
+    query_5[5] = 1.0;
     let results_5 = manager.search(&query_5, 3)?;
-    
+
     println!("🔍 Search Results for Node 5 (Should find 5):");
     for (id, score) in &results_5 {
         println!("  - Node ID: {}, Score: {:.4}", id, score);
@@ -110,13 +130,13 @@ fn main() -> anyhow::Result<()> {
     // 結果、Node 2 は探索されず、スコア計算も行われないため、検索結果に入らない。
     let mut query_skip = [0.0f32; 768];
     query_skip[2] = 1.0; // 本来は Node 2 を探したいが、親の Node 1 と直交
-    
+
     let results_skip = manager.search(&query_skip, 3)?;
     println!("🔍 Search Results for Query 2 (A1) with skip enabled (Should NOT find 2):");
     for (id, score) in &results_skip {
         println!("  - Node ID: {}, Score: {:.4}", id, score);
     }
-    
+
     // スキップされたため、Node 2 も Node 3 もヒットせず、Node 0 や他のノードのみが低スコアで残るはず
     let found_2 = results_skip.iter().any(|(id, _)| *id == 2);
     if !found_2 {

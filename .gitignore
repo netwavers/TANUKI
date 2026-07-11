@@ -17,3 +17,7 @@ build_errors_utf8.txt
 log.txt
 serving_log.txt
 knowledge.bin
+*.bak
+*.db-shm
+*.db-wal
+

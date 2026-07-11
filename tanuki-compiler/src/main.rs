@@ -17,6 +17,59 @@ use unicode_normalization::UnicodeNormalization;
 
 const CHECKPOINT_PATH: &str = ".gemini/memory/tanuki_checkpoint.json";
 
+/// RAG policy: skip paths that pollute semantic search (see Documents/documents_rag_policy.yaml).
+fn projects_archive_excluded() -> bool {
+    std::env::var("TANUKI_EXCLUDE_PROJECTS_ARCHIVE")
+        .map(|v| v != "0" && v.to_lowercase() != "false")
+        .unwrap_or(true)
+}
+
+/// `01_Projects/<project>/archive/**` — deprecated specs / trial docs, not SSOT for RAG.
+fn is_under_01_projects_archive(path_str: &str) -> bool {
+    if !projects_archive_excluded() {
+        return false;
+    }
+    let parts: Vec<&str> = path_str.split('/').filter(|p| !p.is_empty()).collect();
+    for i in 0..parts.len() {
+        if parts[i] == "01_Projects" && i + 2 < parts.len() && parts[i + 2] == "archive" {
+            return true;
+        }
+    }
+    false
+}
+
+fn should_exclude_md(path: &Path) -> bool {
+    let path_str = path.to_string_lossy().replace('\\', "/");
+
+    if is_under_01_projects_archive(&path_str) {
+        return true;
+    }
+
+    let name_excludes: Vec<String> = std::env::var("TANUKI_EXCLUDE_FILE_NAMES")
+        .unwrap_or_else(|_| "Devlog_Index.md".to_string())
+        .split('|')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+        if name_excludes.iter().any(|n| n == file_name) {
+            return true;
+        }
+    }
+
+    let path_excludes: Vec<String> = std::env::var("TANUKI_EXCLUDE_PATH_CONTAINS")
+        .unwrap_or_else(|_| {
+            "/InBox/|/Keys/|/Archive/Legacy/|/Archive/Obsolete/|/.obsidian/".to_string()
+        })
+        .split('|')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    path_excludes.iter().any(|frag| path_str.contains(frag))
+}
+
 enum SubCommand {
     Compile {
         db_path: String,
@@ -308,10 +361,12 @@ async fn run_pipeline(
         dirs_str.split(',').map(|s| s.trim().to_string()).collect()
     } else {
         vec![
-            "../../Documents/InBox".to_string(),
             "../../Documents/Archive/Devlog".to_string(),
-            "../../Documents/Archive/Media".to_string(),
             "../../Documents/Archive/Specifications".to_string(),
+            "../../Documents/Archive/Media".to_string(),
+            "../../Documents/Technical".to_string(),
+            "../../Documents/01_Projects".to_string(),
+            "../../Documents/Active".to_string(),
         ]
     };
 
@@ -351,9 +406,19 @@ async fn run_pipeline(
             continue;
         }
 
-        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(dir)
+            .into_iter()
+            .filter_entry(|e| {
+                let p = e.path().to_string_lossy().replace('\\', "/");
+                !is_under_01_projects_archive(&p)
+            })
+            .filter_map(|e| e.ok())
+        {
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
+            if path.is_file()
+                && path.extension().map_or(false, |ext| ext == "md")
+                && !should_exclude_md(path)
+            {
                 let path_str = path.to_path_buf().to_string_lossy().to_string();
                 processed_files.insert(path_str.clone());
                 
@@ -394,12 +459,19 @@ async fn run_pipeline(
 
     // Phase 1.5: Cleanup (削除されたファイルのメタ情報とノードを削除)
     let all_stored_meta = db.get_all_file_meta()?;
-    for meta in all_stored_meta {
-        if !processed_files.contains(&meta.path) {
+    let to_delete: Vec<String> = all_stored_meta
+        .into_iter()
+        .filter(|meta| !processed_files.contains(&meta.path))
+        .map(|meta| {
             println!("  Cleanup: Removing deleted file data: {}", meta.path);
-            db.delete_nodes_by_source(&meta.path)?;
-            db.delete_file_meta(&meta.path)?;
-        }
+            meta.path
+        })
+        .collect();
+
+    if !to_delete.is_empty() {
+        println!("  Cleanup: Removing {} files and their nodes from knowledge base in transaction...", to_delete.len());
+        db.delete_files_and_nodes_in_transaction(&to_delete)?;
+        println!("  Cleanup: Done.");
     }
 
     if any_changed {

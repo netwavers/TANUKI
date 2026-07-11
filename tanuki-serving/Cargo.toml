@@ -16,3 +16,5 @@ tower-http = { workspace = true }
 utoipa = { workspace = true }
 tanuki-compiler = { path = "../tanuki-compiler" }
 unicode-normalization = "0.1.24"
+reqwest = { workspace = true }
+chrono = { workspace = true }
