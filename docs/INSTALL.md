@@ -71,3 +71,50 @@ pip install tanuki
 python run_tests.py
 ```
 テストがすべて正常に完了すると、`All Tests Completed Successfully! 💮` と出力されます。
+
+---
+
+## 💡 6. 使い方 (Quick Start)
+
+### ① Python SDK を用いた API サーバーとの連携
+`tanuki-serving` API サーバーが起動している状態で、対話やコンテキスト探索を呼び出す基本的なコード例です。
+
+```python
+from tanuki import TanukiClient
+
+# 1. クライアントの初期化（API サーバーのベースURLを指定）
+client = TanukiClient(base_url="http://localhost:8000")
+
+# 2. 知識ベースからの関連コンテキスト探索
+# （Irminsul 探索により、関連するノードを高速で抽出して結合します）
+context = client.query_context("平沢リンの好きな高中正義の曲は？")
+print("--- 探索されたコンテキスト ---")
+print(context)
+
+# 3. コンテキストを結合した投機的対話の実行
+# （プロンプトは自動的に Flat-AST で削減・プルーニングされます）
+response = client.chat("平沢リンの好きな曲を教えてください。")
+print("\n--- LLM の回答 ---")
+print(response)
+```
+
+### ② Rust コア拡張 (`tanuki_rust`) を直接使用したローカル探索
+API サーバーを経由せず、手元の Python スクリプトから直接 `knowledge.bin` (FlatBuffers) をメモリマップドロードし、超高速探索を呼び出すコード例です。
+
+```python
+import tanuki_rust
+
+# 1. 探索エンジンの初期化（ローカルの FlatBuffers バイナリを指定）
+# （ファイルは Zero-Copy でメモリマップ（mmap）ロードされます）
+engine = tanuki_rust.PyTanukiEngine(bin_path="knowledge.bin")
+
+# 2. キーワード検索の実行（上位 5 件を取得）
+results = engine.search("平沢リン", limit=5)
+
+print("--- ローカル探索結果 ---")
+for node in results:
+    print(f"Node ID: {node.node_id}")
+    print(f"Payload: {node.payload}")
+    print("-" * 20)
+```
+
