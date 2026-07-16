@@ -58,10 +58,7 @@ jobs:
           # 🪟 Windows 64bit
           - os: windows-latest
             target: x64
-          # 🍏 macOS Intel & Apple Silicon (Universal2)
-          - os: macos-13
-            target: x86_64
-          - os: macos-14
+          - os: macos-latest
             target: aarch64
 
     steps:
