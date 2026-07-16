@@ -294,9 +294,14 @@ async fn main() -> Result<()> {
 
             let res = run_pipeline(final_no_reduce, unified_llm.as_ref(), &db_path, src_dirs).await;
 
-            // VRAMの防衛: 成功・失敗を問わず、必ずOllama等のVRAMモデルをアンロードする
-            println!("  🧹 VRAM Guard: Unloading model from GPU/Cloud context...");
-            let _ = unified_llm.unload().await;
+            // VRAMの防衛: 成功・失敗を問わず、環境変数の指定がなければ必ずOllama等のVRAMモデルをアンロードする
+            let keep_alive_env = std::env::var("TANUKI_KEEP_ALIVE").map(|v| v == "1" || v.to_lowercase() == "true").unwrap_or(false);
+            if !keep_alive_env {
+                println!("  🧹 VRAM Guard: Unloading model from GPU/Cloud context...");
+                let _ = unified_llm.unload().await;
+            } else {
+                println!("  🔒 VRAM Guard: Keeping model loaded in VRAM (TANUKI_KEEP_ALIVE is set).");
+            }
 
             res
         }

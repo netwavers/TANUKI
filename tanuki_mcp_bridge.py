@@ -59,8 +59,15 @@ def serialize_ast_to_markdown(data: list) -> str:
         depth = item.get("depth", 1)
         
         # 冗長なメタデータの削ぎ落としとクリーン化
-        clean_content = content.replace("\r\n", "\n")
+        clean_content = content.replace("\r\n", "\n").strip()
         
+        # 本文が実質的にタイトルと同一、または空の場合は除外してノイズを防ぐ
+        clean_title_comp = "".join(c for c in title if not c.isspace() and c != '#')
+        clean_content_comp = "".join(c for c in clean_content if not c.isspace() and c != '#')
+        
+        if not clean_content or clean_title_comp == clean_content_comp or clean_content_comp == "AISummaryPlaceholder":
+            continue
+            
         formatted_text += f"{'#' * min(depth + 2, 6)} 🌲 Node [{i+1}]: {title}\n"
         formatted_text += f"- **Source**: `{source_path}`\n\n"
         formatted_text += f"```markdown\n{clean_content}\n```\n\n"

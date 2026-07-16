@@ -130,7 +130,7 @@ impl FlatAST {
     }
 
     /// 各ノードのヘッダとペイロードへの参照を走査する内部ヘルパー
-    fn iter_nodes(&self) -> NodeIter<'_> {
+    pub fn iter_nodes(&self) -> NodeIter<'_> {
         NodeIter {
             data: &self.data,
             offset: 0,
@@ -372,7 +372,7 @@ struct PruneCandidate {
 }
 
 /// FlatAST のノードを走査するための内部イテレータ
-struct NodeIter<'a> {
+pub struct NodeIter<'a> {
     data: &'a [u8],
     offset: usize,
 }

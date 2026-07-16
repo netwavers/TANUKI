@@ -20,6 +20,7 @@
             <a href="#" class="nav-tab active" data-tab="dashboard">Dashboard</a>
             <a href="#" class="nav-tab" data-tab="tree">Knowledge Tree</a>
             <a href="#" class="nav-tab" data-tab="systems">Systems</a>
+            <a href="#" class="nav-tab" data-tab="playground">Core Playground</a>
         </div>
         <div class="status-indicator">
             <span class="dot pulse"></span>
@@ -239,6 +240,158 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Playground View -->
+        <div id="playground-view" class="view-content" style="display: none; animation: fadeIn 0.4s ease-in-out;">
+            <header class="hero" style="margin-bottom: 2rem;">
+                <h1 class="glow-text" style="font-size: 3rem;">Core Playground.</h1>
+                <p>Flat-AST によるインプレース論理削減、重要度 Tier 縮退、およびローカル LLM 推論テスト。</p>
+            </header>
+
+            <div class="playground-layout" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 2rem; align-items: start; margin-top: 1rem; width: 100%;">
+                <!-- 左カラム: エディタ＆設定 -->
+                <div class="playground-column-left" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+                    <!-- 基本プロンプト設定 (System / Instruction) -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                            <i data-lucide="settings-2" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">AST Base Configurations</h3>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                <label style="font-size: 0.8rem; color: var(--text-dim); font-weight: 600;">System Constraint (システム制約 - 保護)</label>
+                                <textarea id="pg-system-constraint" class="glass-input mono" style="height: 60px; font-size: 0.85rem; padding: 0.6rem; resize: vertical; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: white;">回答は必ず『〜ですわ』というお嬢様メイド口調で終わるようにし、結論のパディングバイト数だけを日本語で簡潔に答えなさい。</textarea>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                <label style="font-size: 0.8rem; color: var(--text-dim); font-weight: 600;">Task Instruction (タスク指示 - 保護)</label>
+                                <textarea id="pg-task-instruction" class="glass-input mono" style="height: 60px; font-size: 0.85rem; padding: 0.6rem; resize: vertical; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: white;">README.md の仕様定義を参考に、tanuki-core がアライメント境界として採用している物理メモリのパディングバイト数を答えなさい。</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- トークンバジェット設定 -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                            <i data-lucide="sliders" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">Token Budget Limit</h3>
+                        </div>
+                        <div style="padding: 0.5rem 0.2rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.8rem; font-size: 0.9rem;">
+                                <span style="color: var(--text-dim);">Target Limit (Bytes)</span>
+                                <span id="pg-limit-val" class="mono" style="color: var(--sunset-gold); font-weight: 700;">1,500</span>
+                            </div>
+                            <input type="range" id="pg-target-limit" min="100" max="6000" step="50" value="1500" style="width: 100%; accent-color: var(--sunset-gold); cursor: pointer;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim); margin-top: 0.4rem;">
+                                <span class="mono">100B</span>
+                                <span class="mono">6,000B (Max)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ドキュメントサブノード追加・編集 -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                <i data-lucide="layers" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">Reference Nodes</h3>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <!-- Auto Tier Switch -->
+                                <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-dim); cursor: pointer; user-select: none; margin-right: 0.5rem;" title="タスク指示のキーワードからTier(重要度)を自動割り当てします">
+                                    <span style="font-weight: 500; color: white;">Auto Tier</span>
+                                    <div style="position: relative; width: 34px; height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; border: 1px solid var(--glass-border); transition: background 0.3s, border-color 0.3s;" id="pg-autotier-switch-bg">
+                                        <input type="checkbox" id="pg-autotier-switch" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                        <div style="position: absolute; content: ''; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: rgba(255,255,255,0.7); border-radius: 50%; transition: transform 0.3s, background-color 0.3s; box-shadow: 0 0 3px rgba(0,0,0,0.5);" id="pg-autotier-switch-thumb"></div>
+                                    </div>
+                                </label>
+                                <input type="file" id="pg-file-input" accept=".md,.txt,.json,.html" style="display: none;">
+                                <button id="pg-import-btn" class="glass-button" style="padding: 0.3rem 0.8rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; border-radius: 4px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; cursor: pointer;">
+                                    <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Import File
+                                </button>
+                                <button id="pg-add-node-btn" class="glass-button" style="padding: 0.3rem 0.8rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; border-radius: 4px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; cursor: pointer;">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Add Node
+                                </button>
+                            </div>
+                        </div>
+                        <div id="pg-nodes-list" style="display: flex; flex-direction: column; gap: 1rem; max-height: 380px; overflow-y: auto; padding-right: 0.5rem;">
+                            <!-- 動的に追加されるノード -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右カラム: 削減可視化 ＆ LLMコンソール -->
+                <div class="playground-column-right" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+                    <!-- 統計と要約 -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                            <i data-lucide="pie-chart" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">Reduction Statistics</h3>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                <span>Initial Content Token Size:</span>
+                                <span id="pg-stat-initial" class="mono" style="font-weight: 600; color: white;">0 B</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                <span>Pruned (Deactivated):</span>
+                                <span id="pg-stat-pruned" class="mono" style="font-weight: 600; color: #ff5f56;">0 B</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                <span>Final Active Prompt Size:</span>
+                                <span id="pg-stat-final" class="mono" style="font-weight: 600; color: #4ade80;">0 B</span>
+                            </div>
+                            <!-- 進捗バー風の可視化 -->
+                            <div class="progress-bar-bg" style="width: 100%; height: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 6px; overflow: hidden; margin-top: 0.5rem; position: relative;">
+                                <div id="pg-reduction-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #4ade80, var(--sunset-gold)); transition: width 0.3s ease-out;"></div>
+                            </div>
+                            <div style="text-align: right; font-size: 0.8rem; color: var(--text-dim);">
+                                Active Ratio: <span id="pg-stat-ratio" class="mono" style="font-weight: bold; color: var(--sunset-gold);">100%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 削減比較ツリー可視化 -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                            <i data-lucide="git-branch" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">Flat-AST Status Visualizer</h3>
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1rem; margin-top: 0.2rem;">
+                            スライダーやノード変更に応じて、削除（Deactivated）されたノードはディム（グレーアウト＆打ち消し線）化されます。
+                        </p>
+                        <div id="pg-tree-visualizer" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 380px; overflow-y: auto; padding-right: 0.5rem;">
+                            <!-- ここにノードのActive/Prunedステータスを描画 -->
+                        </div>
+                    </div>
+
+                    <!-- LLM推論テスト -->
+                    <div class="bento-item glass" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="bento-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                <i data-lucide="terminal" style="color: var(--sunset-gold); width: 20px; height: 20px;"></i>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: white;">Ollama Local Inference Console</h3>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                <select id="pg-model-select" class="glass-input" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: white; width: auto; cursor: pointer;">
+                                    <option value="gemma4:e2b">gemma4:e2b (Lightweight)</option>
+                                    <option value="gemma4:e4b">gemma4:e4b (Default)</option>
+                                    <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b</option>
+                                </select>
+                                <button id="pg-infer-btn" class="glass-button" style="padding: 0.3rem 0.8rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; border-radius: 4px; border: 1px solid var(--sunset-gold); background: rgba(222, 165, 132, 0.1); color: var(--sunset-gold); font-weight: bold; cursor: pointer; transition: all 0.2s;">
+                                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Run Inference 🐾
+                                </button>
+                            </div>
+                        </div>
+                        <div id="pg-console" class="mono" style="margin-top: 1rem; padding: 1rem; height: 120px; overflow-y: auto; font-size: 0.8rem; background: rgba(5,6,10,0.8); border: 1px solid var(--glass-border); border-radius: 8px; color: #a5d6ff; line-height: 1.5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8); position: relative;">
+                            <div id="pg-console-placeholder" style="color: var(--text-dim); text-align: center; margin-top: 2rem;">
+                                推論結果がここに表示されますわ。上のボタンを押してくださいませ。🐾
+                            </div>
+                            <div id="pg-console-text" style="white-space: pre-wrap; display: none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -694,6 +847,7 @@
         const tabs = document.querySelectorAll('.nav-tab');
         const dashboardView = document.getElementById('dashboard-view');
         const systemsView = document.getElementById('systems-view');
+        const playgroundView = document.getElementById('playground-view');
 
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -709,26 +863,662 @@
                     statusIntervalId = null;
                 }
 
+                // ビューを非表示にする
+                dashboardView.style.display = 'none';
+                systemsView.style.display = 'none';
+                playgroundView.style.display = 'none';
+
                 if (targetTab === 'systems') {
-                    dashboardView.style.display = 'none';
                     systemsView.style.display = 'block';
                     fetchSystemStatus();
-                    // 5秒ごとに更新
                     statusIntervalId = setInterval(fetchSystemStatus, 5000);
                 } else if (targetTab === 'dashboard') {
-                    systemsView.style.display = 'none';
                     dashboardView.style.display = 'block';
                 } else if (targetTab === 'tree') {
-                    // Treeタブクリック時はDashboard表示にしたうえでRecentClustersまでスクロール
-                    systemsView.style.display = 'none';
                     dashboardView.style.display = 'block';
                     const clustersHeader = document.querySelector('.bento-item.glass.col-span-2 h3');
                     if (clustersHeader) {
                         clustersHeader.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
+                } else if (targetTab === 'playground') {
+                    playgroundView.style.display = 'block';
+                    initPlayground();
                 }
             });
         });
+
+        // ==========================================
+        // 🐾 Core Playground ロジック 🐾
+        // ==========================================
+        let pgNodes = [
+            {
+                title: "概要 (Overview)",
+                body: "T.A.N.U.K.I. は、大量のドキュメント、開発日誌、およびプロジェクト仕様書を AI が「体系的に」構造化して理解し、必要な情報を超高速で探索・削減・要約するための自律型知識エンジンです。Map-Reduce知識構造化（Irminsul）を採用しています。",
+                tier: 1
+            },
+            {
+                title: "インプレース論理削除と二段フォールバック",
+                body: "トークン予算制限時、バッファデータの再アロケーションを行わず、16バイト固定長ヘッダの Active ビットを 0 に反転させるだけの高速論理削除を実装。さらに予算制限が厳しい場合、SystemやInstructionノードの内部構造（SubNode）を、重要度 Tier（Tier3 -> Tier2）に従って段階的に自動一括論理削除して自己縮退させます（最重要な Tier1 は死守されます）。物理パディング境界は16バイトです。",
+                tier: 2
+            },
+            {
+                title: "CI/CD 自動パッケージング ＆ リリース",
+                body: "GitHub Actions と maturin-action を用い、Linux, Windows, macOS のマルチプラットフォーム向けバイナリパッケージ（Wheel）を自動ビルド。パブリックリリース時は OIDC 信頼連携により PyPI に安全にデプロイされます。",
+                tier: 3
+            }
+        ];
+        let playgroundInitialized = false;
+        let currentDslOutput = "";
+        let pruneTimeout = null;
+        let autoTierEnabled = false;
+
+        function initPlayground() {
+            if (playgroundInitialized) return;
+            
+            // イベントリスナーの登録
+            document.getElementById('pg-system-constraint').addEventListener('input', debouncePrune);
+            document.getElementById('pg-task-instruction').addEventListener('input', debouncePrune);
+            
+            const limitSlider = document.getElementById('pg-target-limit');
+            limitSlider.addEventListener('input', (e) => {
+                document.getElementById('pg-limit-val').textContent = parseInt(e.target.value).toLocaleString();
+                debouncePrune();
+            });
+
+            document.getElementById('pg-add-node-btn').addEventListener('click', addPlaygroundNode);
+            document.getElementById('pg-infer-btn').addEventListener('click', runPlaygroundInference);
+
+            // ファイルインポートイベントの登録
+            const fileInput = document.getElementById('pg-file-input');
+            const importBtn = document.getElementById('pg-import-btn');
+            if (importBtn && fileInput) {
+                importBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', handlePlaygroundFileImport);
+            }
+
+            // Auto Tier トグルの登録
+            const autoTierSwitch = document.getElementById('pg-autotier-switch');
+            if (autoTierSwitch) {
+                autoTierSwitch.addEventListener('change', (e) => {
+                    autoTierEnabled = e.target.checked;
+                    updateAutoTierSwitchUI();
+                    if (autoTierEnabled) {
+                        calculateAutoTiers();
+                    }
+                    renderPlaygroundNodeEditor();
+                    debouncePrune();
+                });
+            }
+
+            renderPlaygroundNodeEditor();
+            runPlaygroundPrune();
+            playgroundInitialized = true;
+        }
+
+        function renderPlaygroundNodeEditor() {
+            const listContainer = document.getElementById('pg-nodes-list');
+            listContainer.innerHTML = '';
+
+            pgNodes.forEach((node, index) => {
+                const card = document.createElement('div');
+                card.className = 'pg-node-editor-card';
+                card.innerHTML = `
+                    <button class="pg-node-delete-btn" onclick="deletePlaygroundNode(${index})" title="ノードを削除">
+                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    </button>
+                    <div style="display: flex; gap: 0.6rem; flex-direction: column;">
+                        <input type="text" class="glass-input" value="${node.title}" placeholder="ノードのタイトル..." style="font-weight: 600;" oninput="updateNodeData(${index}, 'title', this.value)">
+                        <textarea class="glass-input mono" placeholder="内容..." style="font-size: 0.8rem; height: 50px; resize: vertical;" oninput="updateNodeData(${index}, 'body', this.value)">${node.body}</textarea>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-top: 0.2rem;">
+                        <span style="color: var(--text-dim);">${autoTierEnabled ? 'Auto Tier (計算値):' : 'Importance Tier:'}</span>
+                        <select class="glass-input" style="width: auto; font-size: 0.75rem; padding: 0.15rem 0.4rem; ${autoTierEnabled ? 'opacity: 0.7; cursor: not-allowed;' : ''}" ${autoTierEnabled ? 'disabled' : ''} onchange="updateNodeData(${index}, 'tier', parseInt(this.value))">
+                            <option value="1" ${node.tier === 1 ? 'selected' : ''}>Tier 1 (最重要・削らない)</option>
+                            <option value="2" ${node.tier === 2 ? 'selected' : ''}>Tier 2 (中間コンテキスト)</option>
+                            <option value="3" ${node.tier === 3 ? 'selected' : ''}>Tier 3 (補足・削りやすい)</option>
+                        </select>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+            
+            // Lucideアイコンを再レンダリング
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+
+        function updateNodeData(index, field, value) {
+            pgNodes[index][field] = value;
+            debouncePrune();
+        }
+
+        function addPlaygroundNode() {
+            pgNodes.push({
+                title: `新規参照ノード ${pgNodes.length + 1}`,
+                body: "ここに関連するコンテキストを入力してください。",
+                tier: 3
+            });
+            renderPlaygroundNodeEditor();
+            debouncePrune();
+        }
+
+        window.deletePlaygroundNode = function(index) {
+            pgNodes.splice(index, 1);
+            renderPlaygroundNodeEditor();
+            debouncePrune();
+        };
+
+        window.updateNodeData = updateNodeData;
+
+        function handlePlaygroundFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const text = evt.target.result;
+                const parsedNodes = parseDocumentToNodes(text, file.name);
+                
+                if (parsedNodes.length > 0) {
+                    pgNodes = parsedNodes;
+                    renderPlaygroundNodeEditor();
+                    runPlaygroundPrune();
+                } else {
+                    alert("有効なテキストコンテンツが見つかりませんでしたわ。");
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        }
+
+        function parsePlainTextToNodes(text, fileName) {
+            const lines = text.split(/\r?\n/);
+            const nodes = [];
+            let currentTitle = "";
+            let currentBodyLines = [];
+
+            const headingRegex = /^(#{1,6})\s+(.+)$/;
+            let hasHeadings = false;
+
+            for (let line of lines) {
+                if (headingRegex.test(line)) {
+                    hasHeadings = true;
+                    break;
+                }
+            }
+
+            if (hasHeadings) {
+                for (let line of lines) {
+                    const match = line.match(headingRegex);
+                    if (match) {
+                        if (currentTitle || currentBodyLines.length > 0) {
+                            nodes.push({
+                                title: currentTitle || "無題のセクション",
+                                body: currentBodyLines.join('\n').trim(),
+                                tier: 3
+                            });
+                        }
+                        currentTitle = match[2].trim();
+                        currentBodyLines = [];
+                    } else {
+                        currentBodyLines.push(line);
+                    }
+                }
+                if (currentTitle || currentBodyLines.length > 0) {
+                    nodes.push({
+                        title: currentTitle || "無題のセクション",
+                        body: currentBodyLines.join('\n').trim(),
+                        tier: 3
+                    });
+                }
+            } else {
+                // 見出しがないプレーンテキストの場合：段落（空行）ごとに分割
+                let paragraphText = [];
+                let rawNodes = [];
+                let secCount = 1;
+                const fileBaseName = fileName.replace(/\.[^/.]+$/, "");
+                
+                for (let line of lines) {
+                    const trimmed = line.trim();
+                    if (trimmed === "") {
+                        if (paragraphText.length > 0) {
+                            rawNodes.push(paragraphText.join('\n').trim());
+                            paragraphText = [];
+                        }
+                    } else {
+                        paragraphText.push(line);
+                    }
+                }
+                if (paragraphText.length > 0) {
+                    rawNodes.push(paragraphText.join('\n').trim());
+                }
+
+                // 各段落について、長さが 450 文字を超える場合はさらに文単位（句読点）でスライス分割（チャンキング）
+                rawNodes.forEach(para => {
+                    if (para.length <= 450) {
+                        nodes.push({
+                            title: `${fileBaseName} - Sec ${secCount++}`,
+                            body: para,
+                            tier: 3
+                        });
+                    } else {
+                        // 400文字目安でチャンク分割
+                        let start = 0;
+                        while (start < para.length) {
+                            let end = start + 400;
+                            if (end >= para.length) {
+                                end = para.length;
+                            } else {
+                                // 400文字付近の「。」を探して区切る
+                                const sub = para.substring(start, start + 500); // 余裕を見て500文字切り出し
+                                const dotIndex = sub.lastIndexOf('。');
+                                if (dotIndex > 300) { // 300文字以降に「。」があればそこで切る
+                                    end = start + dotIndex + 1;
+                                } else {
+                                    // なければ「\n」やスペースを探す
+                                    const lfIndex = sub.lastIndexOf('\n');
+                                    if (lfIndex > 300) {
+                                        end = start + lfIndex + 1;
+                                    }
+                                    // それもなければそのまま 400 文字で強制スライス
+                                }
+                            }
+                            const chunkText = para.substring(start, end).trim();
+                            if (chunkText.length > 0) {
+                                nodes.push({
+                                    title: `${fileBaseName} - Sec ${secCount++}`,
+                                    body: chunkText,
+                                    tier: 3
+                                });
+                            }
+                            start = end;
+                        }
+                    }
+                });
+            }
+
+            return nodes;
+        }
+
+        function parseDocumentToNodes(text, fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const nodes = [];
+
+            if (ext === 'json') {
+                try {
+                    const data = JSON.parse(text);
+                    const fileBaseName = fileName.replace(/\.[^/.]+$/, "");
+                    
+                    const processJsonValue = (key, val, baseName, nodeList) => {
+                        const cardTitle = `${baseName} - ${key}`;
+                        
+                        if (val === null || val === undefined) {
+                            nodeList.push({ title: cardTitle, body: "null", tier: 3 });
+                            return;
+                        }
+
+                        // もし値が文字列であり、かつ長文（300文字超）またはMarkdown見出しを含む場合
+                        if (typeof val === 'string' && (val.length > 300 || /^(#{1,6})\s+/m.test(val))) {
+                            const subNodes = parsePlainTextToNodes(val, cardTitle);
+                            if (subNodes.length > 0) {
+                                subNodes.forEach(sn => {
+                                    const mergedTitle = sn.title.startsWith(cardTitle) ? sn.title : `${cardTitle} - ${sn.title}`;
+                                    nodeList.push({
+                                        title: mergedTitle,
+                                        body: sn.body,
+                                        tier: 3
+                                    });
+                                });
+                                return;
+                            }
+                        }
+
+                        // オブジェクトの場合
+                        if (typeof val === 'object' && !Array.isArray(val)) {
+                            let hasDeepLongText = false;
+                            Object.keys(val).forEach(subKey => {
+                                const subVal = val[subKey];
+                                if (typeof subVal === 'string' && (subVal.length > 300 || /^(#{1,6})\s+/m.test(subVal))) {
+                                    hasDeepLongText = true;
+                                }
+                            });
+
+                            if (hasDeepLongText) {
+                                // ネストされた値に長文があるので、フラット化して個別に再帰展開！
+                                Object.keys(val).forEach(subKey => {
+                                    processJsonValue(`${key}.${subKey}`, val[subKey], baseName, nodeList);
+                                });
+                                return;
+                            } else {
+                                nodeList.push({
+                                    title: cardTitle,
+                                    body: JSON.stringify(val, null, 2),
+                                    tier: 3
+                                });
+                                return;
+                            }
+                        }
+
+                        // 配列の場合：配列の各要素を展開
+                        if (Array.isArray(val)) {
+                            val.forEach((item, index) => {
+                                processJsonValue(`${key}[${index}]`, item, baseName, nodeList);
+                            });
+                            return;
+                        }
+
+                        // その他基本型
+                        nodeList.push({
+                            title: cardTitle,
+                            body: String(val),
+                            tier: 3
+                        });
+                    };
+
+                    if (Array.isArray(data)) {
+                        data.forEach((item, index) => {
+                            let itemTitle = `Item ${index + 1}`;
+                            if (item && typeof item === 'object') {
+                                const possibleTitle = item.title || item.name || item.heading || item.subject;
+                                if (possibleTitle && typeof possibleTitle === 'string') {
+                                    itemTitle = possibleTitle;
+                                }
+                                // 各キーごとに展開
+                                Object.keys(item).forEach(k => {
+                                    processJsonValue(`${itemTitle}.${k}`, item[k], fileBaseName, nodes);
+                                });
+                            } else {
+                                processJsonValue(`Item ${index + 1}`, item, fileBaseName, nodes);
+                            }
+                        });
+                    } else if (data && typeof data === 'object') {
+                        Object.keys(data).forEach(key => {
+                            processJsonValue(key, data[key], fileBaseName, nodes);
+                        });
+                    } else {
+                        nodes.push({
+                            title: fileBaseName,
+                            body: String(data),
+                            tier: 3
+                        });
+                    }
+                    return nodes.filter(n => n.title.trim() !== "" || n.body.trim() !== "");
+                } catch (e) {
+                    console.error("JSON parse failed, fallback to plain text parser", e);
+                }
+            } else if (ext === 'html' || ext === 'htm') {
+                try {
+                    const domParser = new DOMParser();
+                    const doc = domParser.parseFromString(text, 'text/html');
+                    
+                    const stripTags = ['script', 'style', 'link', 'meta', 'nav', 'footer', 'svg', 'iframe', 'header'];
+                    stripTags.forEach(tag => {
+                        const elems = doc.querySelectorAll(tag);
+                        elems.forEach(el => el.remove());
+                    });
+                    
+                    const fileBaseName = fileName.replace(/\.[^/.]+$/, "");
+                    const headers = doc.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                    
+                    if (headers.length > 0) {
+                        const bodyChildren = doc.body.children;
+                        let currentTitle = fileBaseName;
+                        let currentBodyLines = [];
+                        
+                        for (let el of bodyChildren) {
+                            const tagName = el.tagName.toLowerCase();
+                            if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+                                if (currentBodyLines.length > 0) {
+                                    nodes.push({
+                                        title: currentTitle,
+                                        body: currentBodyLines.join('\n').trim(),
+                                        tier: 3
+                                    });
+                                }
+                                currentTitle = `${fileBaseName} - ${el.textContent.trim()}`;
+                                currentBodyLines = [];
+                            } else {
+                                const txt = el.textContent.trim();
+                                if (txt) {
+                                    currentBodyLines.push(txt);
+                                }
+                            }
+                        }
+                        if (currentBodyLines.length > 0) {
+                            nodes.push({
+                                title: currentTitle,
+                                body: currentBodyLines.join('\n').trim(),
+                                tier: 3
+                            });
+                        }
+                        return nodes.filter(n => n.title.trim() !== "" || n.body.trim() !== "");
+                    } else {
+                        const bodyText = doc.body.innerText || doc.body.textContent || "";
+                        return parsePlainTextToNodes(bodyText, fileName).filter(n => n.title.trim() !== "" || n.body.trim() !== "");
+                    }
+                } catch (e) {
+                    console.error("HTML parse failed, fallback to plain text parser", e);
+                }
+            }
+
+            // フォールバック
+            return parsePlainTextToNodes(text, fileName).filter(n => n.title.trim() !== "" || n.body.trim() !== "");
+        }
+
+        function updateAutoTierSwitchUI() {
+            const bg = document.getElementById('pg-autotier-switch-bg');
+            const thumb = document.getElementById('pg-autotier-switch-thumb');
+            const chk = document.getElementById('pg-autotier-switch');
+            
+            if (!bg || !thumb || !chk) return;
+            
+            if (chk.checked) {
+                bg.style.background = 'rgba(0, 242, 254, 0.25)';
+                bg.style.borderColor = 'var(--neon-blue)';
+                thumb.style.transform = 'translateX(16px)';
+                thumb.style.backgroundColor = 'var(--neon-blue)';
+            } else {
+                bg.style.background = 'rgba(255, 255, 255, 0.1)';
+                bg.style.borderColor = 'var(--glass-border)';
+                thumb.style.transform = 'translateX(0)';
+                thumb.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+            }
+        }
+
+        function calculateAutoTiers() {
+            if (!autoTierEnabled) return;
+            
+            const taskText = document.getElementById('pg-task-instruction').value.trim().toLowerCase();
+            
+            if (!taskText) {
+                pgNodes.forEach(node => {
+                    node.tier = 3;
+                });
+                return;
+            }
+            
+            pgNodes.forEach(node => {
+                const titleLower = node.title.toLowerCase();
+                const bodyLower = node.body.toLowerCase();
+                
+                const cleanTitle = titleLower.replace(/[\s\d.🧹📖🕵️🐾💎✨]/g, '').trim();
+                
+                let matchesTitle = false;
+                if (cleanTitle.length >= 2 && taskText.includes(cleanTitle)) {
+                    matchesTitle = true;
+                } else if (cleanTitle.length > 0 && taskText.includes(cleanTitle)) {
+                    matchesTitle = true;
+                }
+                
+                const keywords = extractKeywords(taskText);
+                let titleMatchCount = 0;
+                let bodyMatchCount = 0;
+                
+                keywords.forEach(kw => {
+                    if (titleLower.includes(kw)) titleMatchCount++;
+                    if (bodyLower.includes(kw)) bodyMatchCount++;
+                });
+                
+                if (matchesTitle || titleMatchCount > 0) {
+                    node.tier = 1;
+                } else if (bodyMatchCount > 0) {
+                    node.tier = 2;
+                } else {
+                    node.tier = 3;
+                }
+            });
+        }
+        
+        function extractKeywords(text) {
+            const matches = text.match(/[\u4e00-\u9faf]+|[\u30a0-\u30ff]+|[a-zA-Z0-9]+/g) || [];
+            const hiraganas = text.match(/[\u3040-\u309f]{2,}/g) || [];
+            return [...new Set([...matches, ...hiraganas])].filter(k => k.length >= 1);
+        }
+
+        function debouncePrune() {
+            if (autoTierEnabled) {
+                calculateAutoTiers();
+                renderPlaygroundNodeEditor();
+            }
+            if (pruneTimeout) clearTimeout(pruneTimeout);
+            pruneTimeout = setTimeout(runPlaygroundPrune, 250);
+        }
+
+        async function runPlaygroundPrune() {
+            const system_constraint = document.getElementById('pg-system-constraint').value;
+            const task_instruction = document.getElementById('pg-task-instruction').value;
+            const target_limit = parseInt(document.getElementById('pg-target-limit').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/playground/prune`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_constraint,
+                        task_instruction,
+                        target_limit,
+                        nodes: pgNodes
+                    }),
+                    mode: 'cors'
+                });
+
+                if (!response.ok) throw new Error("Prune API failed");
+                const data = await response.json();
+
+                // 統計の更新
+                document.getElementById('pg-stat-initial').textContent = `${data.initial_tokens.toLocaleString()} B`;
+                document.getElementById('pg-stat-pruned').textContent = `${data.pruned_tokens.toLocaleString()} B`;
+                document.getElementById('pg-stat-final').textContent = `${data.final_tokens.toLocaleString()} B`;
+
+                const activeRatio = data.initial_tokens > 0 ? Math.round((data.final_tokens / data.initial_tokens) * 100) : 100;
+                document.getElementById('pg-stat-ratio').textContent = `${activeRatio}%`;
+                document.getElementById('pg-reduction-bar').style.width = `${activeRatio}%`;
+
+                // 削減比率に応じてプログレスバーの色変更
+                const pgBar = document.getElementById('pg-reduction-bar');
+                if (activeRatio < 40) {
+                    pgBar.style.background = 'linear-gradient(90deg, #ff5f56, var(--sunset-gold))';
+                } else {
+                    pgBar.style.background = 'linear-gradient(90deg, #4ade80, var(--sunset-gold))';
+                }
+
+                currentDslOutput = data.dsl_output;
+
+                // 可視化ツリーの描画
+                const visualizer = document.getElementById('pg-tree-visualizer');
+                visualizer.innerHTML = '';
+
+                // システム制約とタスク指示を最初に表示（常に保護）
+                visualizer.appendChild(createVisualNodeHtml("System Constraint", system_constraint, 0, true, "Critical (Always Protected)"));
+                visualizer.appendChild(createVisualNodeHtml("Task Instruction", task_instruction, 0, true, "Critical (Always Protected)"));
+
+                // 各サブノードの描画
+                data.nodes.forEach(node => {
+                    visualizer.appendChild(createVisualNodeHtml(node.title, node.body, node.tier, node.is_active, `Tier ${node.tier}`, node.tokens));
+                });
+
+            } catch (err) {
+                console.error("Playground prune failed:", err);
+            }
+        }
+
+        function createVisualNodeHtml(title, body, tier, isActive, badgeText, sizeBytes = null) {
+            const container = document.createElement('div');
+            container.className = `ast-visual-node ${isActive ? 'active-node' : 'pruned-node'}`;
+
+            let sizeInfo = sizeBytes !== null ? `${sizeBytes.toLocaleString()} B` : `${body.length} B`;
+            let statusBadgeClass = isActive ? 'badge-active' : 'badge-pruned';
+            let statusText = isActive ? 'Active' : 'Pruned';
+            
+            let tierClass = 'badge-tier3';
+            if (tier === 0) tierClass = 'badge-tier1';
+            else if (tier === 1) tierClass = 'badge-tier1';
+            else if (tier === 2) tierClass = 'badge-tier2';
+
+            container.innerHTML = `
+                <h4>
+                    <span>${title}</span>
+                    <span class="badge ${statusBadgeClass}">${statusText}</span>
+                </h4>
+                <p>${body.replace(/\n/g, '<br>')}</p>
+                <div class="ast-node-meta">
+                    <span class="badge ${tierClass}">${badgeText}</span>
+                    <span style="color: var(--text-dim); font-size: 0.75rem;">Size: ${sizeInfo}</span>
+                </div>
+            `;
+            return container;
+        }
+
+        async function runPlaygroundInference() {
+            const consoleText = document.getElementById('pg-console-text');
+            const placeholder = document.getElementById('pg-console-placeholder');
+            const inferBtn = document.getElementById('pg-infer-btn');
+            const modelSelect = document.getElementById('pg-model-select');
+
+            placeholder.style.display = 'none';
+            consoleText.style.display = 'block';
+            consoleText.innerHTML = '';
+            
+            // ローディングアニメーション開始
+            let dots = '';
+            const loadingInterval = setInterval(() => {
+                dots = dots.length >= 3 ? '' : dots + '.';
+                consoleText.textContent = `たぬきちゃん、考えておりますわ${dots}🐾 (VRAM排他ロック獲得・LLM推論中)`;
+            }, 300);
+
+            inferBtn.disabled = true;
+            inferBtn.style.opacity = '0.5';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/playground/infer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        dsl_output: currentDslOutput,
+                        model_name: modelSelect.value
+                    }),
+                    mode: 'cors'
+                });
+
+                clearInterval(loadingInterval);
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(errText || "Infer API failed");
+                }
+
+                const data = await response.json();
+                consoleText.textContent = data.response;
+
+            } catch (err) {
+                clearInterval(loadingInterval);
+                consoleText.innerHTML = `<span style="color: #ff5f56;">エラーが発生いたしましたわ: ${err.message}</span>`;
+            } finally {
+                inferBtn.disabled = false;
+                inferBtn.style.opacity = '1';
+            }
+        }
 
         // Initialize
         loadData();

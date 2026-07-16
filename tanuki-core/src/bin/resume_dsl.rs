@@ -29,11 +29,14 @@ async fn main() -> Result<()> {
 
     // 1. SQLite データベースのロード
     println!("  [Step 1] Loading knowledge database...");
-    let db_path = if std::path::Path::new("d:\\Projects\\PyProjects\\TANUKI\\knowledge.db").exists()
-    {
+    let db_path = if std::path::Path::new("d:\\Projects\\PyProjects\\TANUKI\\knowledge.db").exists() {
         "d:\\Projects\\PyProjects\\TANUKI\\knowledge.db"
+    } else if std::path::Path::new("/home/tanuki/Projects/PyProjects/TANUKI/knowledge.db").exists() {
+        "/home/tanuki/Projects/PyProjects/TANUKI/knowledge.db"
+    } else if std::path::Path::new("knowledge.db").exists() {
+        "knowledge.db"
     } else {
-        "d:\\Projects\\PyProjects\\TANUKI\\tanuki-compiler\\knowledge.db"
+        "/home/tanuki/Projects/PyProjects/TANUKI/tanuki-compiler/knowledge.db"
     };
     let db = TanukiDb::open(db_path)?;
 
