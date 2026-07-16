@@ -4,6 +4,9 @@ on:
   push:
     branches: [ "main", "develop" ]
     tags: [ "v*" ]
+    paths-ignore:
+      - 'documents/**'
+      - 'docs/**'
   pull_request:
     branches: [ "main" ]
 
